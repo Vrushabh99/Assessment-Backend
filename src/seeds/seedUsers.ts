@@ -1,8 +1,13 @@
 import mongoose from "mongoose";
 import { connectDatabase } from "../config/db";
-import { User } from "../models/User";
+import { User, UserRole } from "../models/User";
 
-const seedUsers = [
+const seedUsers: Array<{
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: UserRole;
+}> = [
   { firstName: "Aarav", lastName: "Sharma", email: "aarav.sharma@example.com", role: "candidate" },
   { firstName: "Priya", lastName: "Nair", email: "priya.nair@example.com", role: "candidate" },
   { firstName: "Rohan", lastName: "Patel", email: "rohan.patel@example.com", role: "candidate" },

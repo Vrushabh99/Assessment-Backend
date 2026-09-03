@@ -1,5 +1,5 @@
 import { Document, Model, Schema, model } from "mongoose";
-
+import bcrypt from "bcryptjs";
 export type UserRole = "candidate" | "creator" | "admin";
 
 export interface IUser extends Document {
@@ -25,13 +25,11 @@ const userSchema = new Schema<IUser>(
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
-  const bcrypt = await import("bcryptjs");
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
 userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
-  const bcrypt = await import("bcryptjs");
   return bcrypt.compare(candidatePassword, this.password);
 };
 

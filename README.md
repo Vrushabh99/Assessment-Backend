@@ -71,8 +71,10 @@ PORT=4000
 MONGODB_URI=mongodb://127.0.0.1:27017/proctored-assessment
 JWT_SECRET=replace-with-a-long-random-secret
 JWT_EXPIRES_IN=7d
-CLIENT_URL=http://localhost:3000
+CLIENT_URL=http://localhost:3000,http://localhost:3001
 ```
+
+`CLIENT_URL` can contain multiple origins separated by commas.
 
 ## Scripts
 
