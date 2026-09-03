@@ -1,4 +1,4 @@
-# Proctored Assessment Platform Backend
+# Assessment Platform Backend
 
 A Node.js + Express + TypeScript backend for a proctored assessment platform using MongoDB and JWT-based cookie authentication.
 
@@ -34,11 +34,33 @@ src/
 2. Install dependencies
 3. Start MongoDB locally
 4. Run the app
+5. Seed default users
 
 ```bash
 cp .env.example .env
 npm install
 npm run dev
+npm run seed
+```
+
+## Seed Data
+
+The project includes a seed script that inserts:
+
+- 1 admin user
+- 10 candidate users
+
+All seeded users use the same password:
+
+```text
+assessment@19
+```
+
+Default seeded admin account:
+
+```text
+Email: admin@proctoredassessment.com
+Password: assessment@19
 ```
 
 ## Environment Variables
@@ -59,6 +81,7 @@ npm run dev
 npm run build
 npm run start
 npm run typecheck
+npm run seed
 ```
 
 ## Notes
