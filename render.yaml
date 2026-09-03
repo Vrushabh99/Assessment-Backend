@@ -4,6 +4,7 @@ services:
     env: node
     plan: free
     region: oregon
+    runtime: node
     buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
@@ -11,6 +12,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: NODE_VERSION
+        value: 20
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
