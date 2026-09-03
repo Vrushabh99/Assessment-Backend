@@ -49,18 +49,29 @@ export const createQuestion = async (req: Request, res: Response) => {
   success(res, question, "Question created", 201);
 };
 
+const parsePositiveInt = (value: unknown, fallback: number, fieldName: string): number => {
+  if (value === undefined) return fallback;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1) throw new AppError(`${fieldName} must be a positive integer`, 400);
+  return number;
+};
+
 export const listQuestions = async (req: Request, res: Response) => {
   const filter: Record<string, unknown> = {};
-  const { questionText, qp_number, status, type } = req.query;
+  const { search, status, type, page, limit } = req.query;
 
-  if (questionText !== undefined) {
-    if (typeof questionText !== "string" || !questionText.trim()) throw new AppError("questionText filter must be non-empty", 400);
-    filter.questionText = { $regex: questionText.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), $options: "i" };
-  }
-  if (qp_number !== undefined) {
-    const number = Number(qp_number);
-    if (!Number.isInteger(number) || number < 1) throw new AppError("qp_number must be a positive integer", 400);
-    filter.qp_number = number;
+  if (search !== undefined) {
+    if (typeof search !== "string" || !search.trim()) throw new AppError("search filter must be non-empty", 400);
+    const trimmed = search.trim();
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const orConditions: Record<string, unknown>[] = [{ questionText: { $regex: escaped, $options: "i" } }];
+
+    const qpNumber = Number(trimmed);
+    if (Number.isInteger(qpNumber) && qpNumber > 0) {
+      orConditions.push({ qp_number: qpNumber });
+    }
+
+    filter.$or = orConditions;
   }
   if (status !== undefined) {
     if (typeof status !== "string" || !statuses.includes(status as QuestionStatus)) throw new AppError("Invalid status filter", 400);
@@ -71,8 +82,24 @@ export const listQuestions = async (req: Request, res: Response) => {
     filter.type = type;
   }
 
-  const questions = await Question.find(filter).sort({ qp_number: 1 });
-  success(res, questions);
+  const pageNumber = parsePositiveInt(page, 1, "page");
+  const limitNumber = Math.min(parsePositiveInt(limit, 20, "limit"), 100);
+  const skip = (pageNumber - 1) * limitNumber;
+
+  const [questions, total] = await Promise.all([
+    Question.find(filter).sort({ qp_number: 1 }).skip(skip).limit(limitNumber),
+    Question.countDocuments(filter)
+  ]);
+
+  success(res, {
+    questions,
+    pagination: {
+      page: pageNumber,
+      limit: limitNumber,
+      total,
+      totalPages: Math.ceil(total / limitNumber)
+    }
+  });
 };
 
 export const getQuestion = async (req: Request, res: Response) => {

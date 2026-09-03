@@ -136,14 +136,15 @@
         "request": {
           "method": "GET",
           "url": {
-            "raw": "{{base_url}}/api/questions?questionText=HTTP&qp_number={{qp_number}}&status=draft&type=single-choice",
+            "raw": "{{base_url}}/api/questions?search=HTTP&status=draft&type=single-choice&page=1&limit=20",
             "host": ["{{base_url}}"],
             "path": ["api", "questions"],
             "query": [
-              { "key": "questionText", "value": "HTTP" },
-              { "key": "qp_number", "value": "{{qp_number}}" },
+              { "key": "search", "value": "HTTP" },
               { "key": "status", "value": "draft" },
-              { "key": "type", "value": "single-choice" }
+              { "key": "type", "value": "single-choice" },
+              { "key": "page", "value": "1" },
+              { "key": "limit", "value": "20" }
             ]
           }
         }
