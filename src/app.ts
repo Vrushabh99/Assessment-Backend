@@ -3,6 +3,7 @@ import cors from "cors";
 import express from "express";
 import { env } from "./config/env";
 import authRoutes from "./routes/authRoutes";
+import questionRoutes from "./routes/questionRoutes";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 
 const app = express();
@@ -28,6 +29,7 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/questions", questionRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

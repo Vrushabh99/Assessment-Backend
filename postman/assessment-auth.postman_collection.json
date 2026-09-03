@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Assessment Platform - Auth API",
-    "description": "Postman collection for register, login, logout, and me endpoints using JWT cookie auth.",
+    "name": "Assessment Platform API",
+    "description": "Postman collection for authentication and question creator endpoints. Login first; Postman stores the JWT cookie automatically.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -9,11 +9,21 @@
       "key": "base_url",
       "value": "http://localhost:4000",
       "type": "string"
+    },
+    {
+      "key": "question_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "qp_number",
+      "value": "1",
+      "type": "string"
     }
   ],
   "item": [
     {
-      "name": "Auth - Register",
+      "name": "POST /api/auth/register",
       "request": {
         "method": "POST",
         "header": [
@@ -40,7 +50,7 @@
       }
     },
     {
-      "name": "Auth - Login",
+      "name": "POST /api/auth/login",
       "request": {
         "method": "POST",
         "header": [
@@ -67,7 +77,7 @@
       }
     },
     {
-      "name": "Auth - Get Me",
+      "name": "GET /api/auth/me",
       "request": {
         "method": "GET",
         "url": {
@@ -84,7 +94,7 @@
       }
     },
     {
-      "name": "Auth - Logout",
+      "name": "POST /api/auth/logout",
       "request": {
         "method": "POST",
         "url": {
@@ -99,6 +109,87 @@
           ]
         }
       }
-    }
-  ]
+    },
+    {
+        "name": "POST /api/questions",
+        "request": {
+          "method": "POST",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"questionText\": \"Which HTTP method is typically used to create a resource?\",\n  \"type\": \"single-choice\",\n  \"difficulty\": \"easy\",\n  \"status\": \"draft\",\n  \"points\": 1,\n  \"additionalInfo\": {\n    \"options\": [\"GET\", \"POST\", \"DELETE\"],\n    \"correctAnswers\": [1]\n  }\n}"
+          },
+          "url": {
+            "raw": "{{base_url}}/api/questions",
+            "host": ["{{base_url}}"],
+            "path": ["api", "questions"]
+          }
+        }
+      },
+      {
+        "name": "GET /api/questions",
+        "request": {
+          "method": "GET",
+          "url": {
+            "raw": "{{base_url}}/api/questions?questionText=HTTP&qp_number={{qp_number}}&status=draft&type=single-choice",
+            "host": ["{{base_url}}"],
+            "path": ["api", "questions"],
+            "query": [
+              { "key": "questionText", "value": "HTTP" },
+              { "key": "qp_number", "value": "{{qp_number}}" },
+              { "key": "status", "value": "draft" },
+              { "key": "type", "value": "single-choice" }
+            ]
+          }
+        }
+      },
+      {
+        "name": "GET /api/questions/:id",
+        "request": {
+          "method": "GET",
+          "url": {
+            "raw": "{{base_url}}/api/questions/{{question_id}}",
+            "host": ["{{base_url}}"],
+            "path": ["api", "questions", "{{question_id}}"]
+          }
+        }
+      },
+      {
+        "name": "PATCH /api/questions/:id",
+        "request": {
+          "method": "PATCH",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": {
+            "mode": "raw",
+            "raw": "{\n  \"status\": \"published\",\n  \"points\": 2\n}"
+          },
+          "url": {
+            "raw": "{{base_url}}/api/questions/{{question_id}}",
+            "host": ["{{base_url}}"],
+            "path": ["api", "questions", "{{question_id}}"]
+          }
+        }
+      },
+      {
+        "name": "DELETE /api/questions/:id",
+        "request": {
+          "method": "DELETE",
+          "url": {
+            "raw": "{{base_url}}/api/questions/{{question_id}}",
+            "host": ["{{base_url}}"],
+            "path": ["api", "questions", "{{question_id}}"]
+          }
+        }
+      }
+    ]
 }
