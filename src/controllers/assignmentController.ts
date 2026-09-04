@@ -4,6 +4,7 @@ import { Assessment } from "../models/Assessment";
 import { Assignment } from "../models/Assignment";
 import { Attempt } from "../models/Attempt";
 import { User } from "../models/User";
+import { Question } from "../models/Question";
 import { AppError } from "../middleware/errorHandler";
 import { success } from "../utils/response";
 
@@ -378,6 +379,7 @@ export const getMyAssessments = async (req: Request, res: Response) => {
     return {
       attemptId: attempt._id,
       assessmentId: assessment._id,
+      assignmentId: assignment._id,
       title: assessment.title,
       description: assessment.description,
       durationMinutes: assignment.durationMinutes,
@@ -390,6 +392,84 @@ export const getMyAssessments = async (req: Request, res: Response) => {
   });
 
   success(res, assessments, "Assessments fetched");
+};
+
+/**
+ * GET /api/candidate/assessments/:assessmentId
+ * Candidate launch payload for an assigned assessment.
+ */
+export const getCandidateAssessment = async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError("Authentication required", 401);
+
+  const { assessmentId, assignmentId } = req.params;
+  if (!isValidObjectId(assessmentId) || !isValidObjectId(assignmentId)) {
+    throw new AppError("Invalid assessmentId or assignmentId", 400);
+  }
+
+  const attempt = await Attempt.findOne({
+    assessmentId,
+    assignmentId,
+    candidateId: req.user.id
+  })
+    .select("_id assessmentId assignmentId candidateId status startedAt submittedAt answers")
+    .lean();
+
+  if (!attempt) {
+    throw new AppError("Assessment is not assigned to this candidate", 404);
+  }
+
+  const assignment = await Assignment.findOne({
+    _id: assignmentId,
+    assessmentId
+  })
+    .select("_id assessmentId expiresAt durationMinutes violationLimits status description")
+    .lean();
+  if (!assignment) throw new AppError("Assignment is invalid for this assessment", 400);
+
+  const assessment = await Assessment.findOne({
+    _id: assessmentId,
+    status: "published"
+  })
+    .select("_id title questionIds totalPoints")
+    .lean();
+
+  if (!assessment) {
+    throw new AppError("Published assessment not found", 404);
+  }
+
+  const questions = await Question.find({
+    _id: { $in: assessment.questionIds }
+  })
+    .select("_id questionText type difficulty points qp_number additionalInfo.options")
+    .lean();
+
+  const questionById = new Map(questions.map((question) => [question._id.toString(), question]));
+  const orderedQuestions = assessment.questionIds
+    .map((questionId) => questionById.get(questionId.toString()))
+    .filter((question): question is NonNullable<typeof question> => Boolean(question));
+
+  success(res, {
+    attempt: {
+      id: attempt._id,
+      status: attempt.status,
+      startedAt: attempt.startedAt,
+      submittedAt: attempt.submittedAt
+    },
+    assignment: {
+      id: assignment._id,
+      durationMinutes: assignment.durationMinutes,
+      expiresAt: assignment.expiresAt,
+      violationLimits: assignment.violationLimits,
+      description: assignment.description,
+      status: assignment.status
+    },
+    assessment: {
+      id: assessment._id,
+      title: assessment.title,
+      totalPoints: assessment.totalPoints,
+      questions: orderedQuestions
+    }
+  }, "Assessment fetched");
 };
 
 /**

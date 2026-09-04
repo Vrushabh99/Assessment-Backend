@@ -7,7 +7,7 @@ export type ViolationType =
 
 interface IAnswer {
   questionId: Types.ObjectId;
-  selectedOptionIds?: Types.ObjectId[];
+  selectedOptionIds?: number[];
   textAnswer?: string;
   isCorrect: boolean | null;
   marksObtained: number;
@@ -50,7 +50,7 @@ export interface IAttempt extends Document {
 const answerSchema = new Schema<IAnswer>(
   {
     questionId: { type: Schema.Types.ObjectId, ref: "Question", required: true },
-    selectedOptionIds: [{ type: Schema.Types.ObjectId }],
+    selectedOptionIds: [{ type: Number }],
     textAnswer: { type: String },
     isCorrect: { type: Boolean, default: null },
     marksObtained: { type: Number, default: 0 },
