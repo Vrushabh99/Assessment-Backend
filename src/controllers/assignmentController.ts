@@ -344,6 +344,238 @@ export const getAssignmentDetail = async (req: Request, res: Response) => {
 };
 
 /**
+ * GET /api/admin/assignments/:assignmentId/candidates
+ * Get all candidates assigned to an assignment with their attempt details.
+ * Supports filtering by status and searching by candidate name or email using MongoDB aggregation.
+ */
+export const getAssignmentCandidates = async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError("Authentication required", 401);
+
+  const { assignmentId } = req.params;
+  const { status, page = "1", limit = "50", search } = req.query as Record<string, string>;
+
+  if (!isValidObjectId(assignmentId)) {
+    throw new AppError("Invalid assignmentId", 400);
+  }
+
+  const assignment = await Assignment.findById(assignmentId)
+    .populate("assessmentId", "title totalPoints description")
+    .lean() as any;
+  if (!assignment) {
+    throw new AppError("Assignment not found", 404);
+  }
+
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+
+  // Build aggregation pipeline
+  const pipeline: any[] = [];
+
+  // Step 1: Match assignment
+  pipeline.push({
+    "$match": { assignmentId: new Types.ObjectId(String(assignmentId)) }
+  });
+
+  // Step 2: Add status filter if provided
+  if (status) {
+    if (!["assigned", "in_progress", "submitted"].includes(status)) {
+      throw new AppError("Invalid status. Must be one of: assigned, in_progress, submitted", 400);
+    }
+    pipeline.push({ "$match": { status } });
+  }
+
+  // Step 3: Lookup candidate
+  pipeline.push({
+    "$lookup": {
+      from: "users",
+      localField: "candidateId",
+      foreignField: "_id",
+      as: "candidateData"
+    }
+  });
+  pipeline.push({ "$unwind": "$candidateData" });
+
+  // Step 4: Add search filter on name and email
+  if (search && search.trim()) {
+    const searchRegex = search.trim().split(/\s+/).join("|");
+    pipeline.push({
+      "$match": {
+        $or: [
+          { "candidateData.firstName": { $regex: searchRegex, $options: "i" } },
+          { "candidateData.lastName": { $regex: searchRegex, $options: "i" } },
+          { "candidateData.email": { $regex: searchRegex, $options: "i" } }
+        ]
+      }
+    });
+  }
+
+  // Step 5: Lookup assessment
+  pipeline.push({
+    "$lookup": {
+      from: "assessments",
+      localField: "assessmentId",
+      foreignField: "_id",
+      as: "assessmentData"
+    }
+  });
+  pipeline.push({ "$unwind": "$assessmentData" });
+
+  // Step 6: Sort by creation time
+  pipeline.push({ "$sort": { createdAt: 1 } });
+
+  // Step 7: Use facet to get count and paginated data
+  pipeline.push({
+    "$facet": {
+      metadata: [{ "$count": "total" }],
+      data: [
+        { "$skip": (pageNum - 1) * limitNum },
+        { "$limit": limitNum },
+        {
+          "$project": {
+            attemptId: "$_id",
+            candidateId: "$candidateData._id",
+            firstName: "$candidateData.firstName",
+            lastName: "$candidateData.lastName",
+            email: "$candidateData.email",
+            attemptStatus: "$status",
+            startedAt: 1,
+            submittedAt: 1,
+            scoreObtained: 1,
+            isFullyScored: 1,
+            violationCounts: 1,
+            autoSubmittedReason: 1,
+            totalMarks: "$assessmentData.totalPoints"
+          }
+        }
+      ]
+    }
+  });
+
+  const result = await Attempt.aggregate(pipeline);
+  const facetResult = result[0] || {};
+  const total = facetResult.metadata?.[0]?.total || 0;
+  const data = facetResult.data || [];
+
+  // Transform data to response format
+  const candidatesList = data.map((item: any) => {
+    const totalViolations = Object.values(item.violationCounts || {}).reduce(
+      (sum: number, count: any) => sum + (typeof count === "number" ? count : 0),
+      0
+    );
+
+    const needsReview =
+      item.autoSubmittedReason !== null ||
+      item.isFullyScored === false ||
+      totalViolations > 0;
+
+    return {
+      attemptId: item.attemptId,
+      id: item.candidateId,
+      firstName: item.firstName,
+      lastName: item.lastName,
+      email: item.email,
+      fullName: `${item.firstName} ${item.lastName}`,
+      status: item.attemptStatus,
+      startedAt: item.startedAt,
+      submittedAt: item.submittedAt,
+      score: item.scoreObtained,
+      totalPoints: item.totalMarks,
+      isFullyScored: item.isFullyScored,
+      autoSubmitted: {
+        reason: item.autoSubmittedReason,
+        enabled: item.autoSubmittedReason !== null
+      },
+      violations: {
+        total: totalViolations,
+        details: item.violationCounts || {}
+      },
+      needsManualReview: needsReview,
+      lastActivityAt: item.submittedAt || item.startedAt || null
+    };
+  });
+
+  // Calculate summary by running a separate aggregation
+  const summaryPipeline: any[] = [];
+  summaryPipeline.push({
+    "$match": { assignmentId: new Types.ObjectId(String(assignmentId)) }
+  });
+  if (status) {
+    summaryPipeline.push({ "$match": { status } });
+  }
+  if (search && search.trim()) {
+    summaryPipeline.push({
+      "$lookup": {
+        from: "users",
+        localField: "candidateId",
+        foreignField: "_id",
+        as: "candidateData"
+      }
+    });
+    summaryPipeline.push({ "$unwind": "$candidateData" });
+    const searchRegex = search.trim().split(/\s+/).join("|");
+    summaryPipeline.push({
+      "$match": {
+        $or: [
+          { "candidateData.firstName": { $regex: searchRegex, $options: "i" } },
+          { "candidateData.lastName": { $regex: searchRegex, $options: "i" } },
+          { "candidateData.email": { $regex: searchRegex, $options: "i" } }
+        ]
+      }
+    });
+  }
+  summaryPipeline.push({
+    "$group": {
+      _id: "$status",
+      count: { $sum: 1 }
+    }
+  });
+
+  const summaryResults = await Attempt.aggregate(summaryPipeline);
+  const summary = {
+    total,
+    assigned: 0,
+    in_progress: 0,
+    submitted: 0,
+    flagged: 0
+  };
+
+  summaryResults.forEach((result: any) => {
+    const statusKey = result._id || "assigned";
+    if (summary.hasOwnProperty(statusKey)) {
+      (summary as any)[statusKey] = result.count;
+    }
+  });
+
+  // Count flagged (violations or auto-submitted)
+  summary.flagged = data.filter((item: any) => {
+    const violations = Object.values(item.violationCounts || {}).reduce(
+      (sum: number, count: any) => sum + (typeof count === "number" ? count : 0),
+      0
+    );
+    return violations > 0 || item.autoSubmittedReason !== null;
+  }).length;
+
+  success(
+    res,
+    {
+      assignment: {
+        id: assignment._id,
+        assessmentId: assignment.assessmentId,
+        durationMinutes: assignment.durationMinutes,
+        expiresAt: assignment.expiresAt,
+        status: assignment.status,
+        createdAt: assignment.createdAt,
+        updatedAt: assignment.updatedAt
+      },
+      summary,
+      candidates: candidatesList,
+      pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) }
+    },
+    "Assignment candidates fetched"
+  );
+};
+
+/**
  * GET /api/candidate/assessments
  * Candidate's own assigned assessments, with derived accessibility.
  */

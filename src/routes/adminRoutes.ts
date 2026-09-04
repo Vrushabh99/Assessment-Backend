@@ -23,6 +23,7 @@ router.patch("/assignments/:assignmentId", asyncHandler(assignmentCtrl.updateAss
 router.post("/assignments/:assignmentId/cancel", asyncHandler(assignmentCtrl.cancelAssignment));
 router.delete("/assignments/:assignmentId", asyncHandler(assignmentCtrl.deleteAssignment));
 router.get("/assignments", asyncHandler(assignmentCtrl.getAssignments));
+router.get("/assignments/:assignmentId/candidates", asyncHandler(assignmentCtrl.getAssignmentCandidates));
 router.get("/assignments/:assignmentId", asyncHandler(assignmentCtrl.getAssignmentDetail));
 
 // Questions
