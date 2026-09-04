@@ -272,7 +272,7 @@ export const getAssignments = async (req: Request, res: Response) => {
   const [assignments, total] = await Promise.all([
     Assignment.find(filter)
       .populate("assessmentId", "title totalPoints description")
-      .populate("assignedBy", "name email")
+      .populate("assignedBy", "firstName lastName email")
       .sort({ createdAt: -1 })
       .skip((pageNum - 1) * limitNum)
       .limit(limitNum)
