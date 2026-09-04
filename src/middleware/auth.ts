@@ -42,3 +42,18 @@ export const requireAuth: RequestHandler = (req: Request, _res: Response, next: 
     next(new AppError("Invalid or expired authentication token", 401));
   }
 };
+
+
+export const requireRole = (...roles: UserRole[]): RequestHandler => {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return next(new AppError("Authentication required", 401));
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return next(new AppError("Access denied: Insufficient permissions", 403));
+    }
+
+    next();
+  };
+};

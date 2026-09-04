@@ -3,8 +3,8 @@ import cors from "cors";
 import express from "express";
 import { env } from "./config/env";
 import authRoutes from "./routes/authRoutes";
-import questionRoutes from "./routes/questionRoutes";
-import assessmentRoutes from "./routes/assessmentRoutes";
+import adminRoutes from "./routes/adminRoutes";
+import candidateRoutes from "./routes/candidateRoutes";
 import { errorHandler, notFound } from "./middleware/errorHandler";
 
 const app = express();
@@ -30,8 +30,8 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-app.use("/api/questions", questionRoutes);
-app.use("/api/assessments", assessmentRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/candidate", candidateRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
