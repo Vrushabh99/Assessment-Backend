@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as assignmentCtrl from "../controllers/assignmentController";
 import * as assessmentCtrl from "../controllers/assessmentController";
+import * as candidateCtrl from "../controllers/candidateController";
 import * as questionCtrl from "../controllers/questionController";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
@@ -10,7 +11,11 @@ const router = Router();
 router.use(requireAuth, requireRole("admin", "creator"));
 
 // Candidates lookup
-router.get("/candidates", asyncHandler(assignmentCtrl.getCandidates));
+router.get("/candidates", asyncHandler(candidateCtrl.getCandidates));
+router.post("/candidates", asyncHandler(candidateCtrl.createCandidate));
+router.get("/candidates/:candidateId", asyncHandler(candidateCtrl.getCandidate));
+router.patch("/candidates/:candidateId", asyncHandler(candidateCtrl.updateCandidate));
+router.delete("/candidates/:candidateId", asyncHandler(candidateCtrl.deleteCandidate));
 
 // Assignments
 router.post("/assessments/:assessmentId/assign", asyncHandler(assignmentCtrl.assignAssessment));
