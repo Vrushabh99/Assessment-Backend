@@ -116,167 +116,291 @@
       }
     },
     {
-        "name": "POST /api/questions",
-        "request": {
-          "method": "POST",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
+      "name": "POST /api/admin/questions",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"questionText\": \"Which HTTP method is typically used to create a resource?\",\n  \"type\": \"single-choice\",\n  \"difficulty\": \"easy\",\n  \"status\": \"draft\",\n  \"points\": 1,\n  \"additionalInfo\": {\n    \"options\": [\"GET\", \"POST\", \"DELETE\"],\n    \"correctAnswers\": [1]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/questions",
+          "host": [
+            "{{base_url}}"
           ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"questionText\": \"Which HTTP method is typically used to create a resource?\",\n  \"type\": \"single-choice\",\n  \"difficulty\": \"easy\",\n  \"status\": \"draft\",\n  \"points\": 1,\n  \"additionalInfo\": {\n    \"options\": [\"GET\", \"POST\", \"DELETE\"],\n    \"correctAnswers\": [1]\n  }\n}"
-          },
-          "url": {
-            "raw": "{{base_url}}/api/questions",
-            "host": ["{{base_url}}"],
-            "path": ["api", "questions"]
-          }
-        }
-      },
-      {
-        "name": "GET /api/questions",
-        "request": {
-          "method": "GET",
-          "url": {
-            "raw": "{{base_url}}/api/questions?search=HTTP&status=draft&type=single-choice&page=1&limit=20",
-            "host": ["{{base_url}}"],
-            "path": ["api", "questions"],
-            "query": [
-              { "key": "search", "value": "HTTP" },
-              { "key": "status", "value": "draft" },
-              { "key": "type", "value": "single-choice" },
-              { "key": "page", "value": "1" },
-              { "key": "limit", "value": "20" }
-            ]
-          }
-        }
-      },
-      {
-        "name": "GET /api/questions/:id",
-        "request": {
-          "method": "GET",
-          "url": {
-            "raw": "{{base_url}}/api/questions/{{question_id}}",
-            "host": ["{{base_url}}"],
-            "path": ["api", "questions", "{{question_id}}"]
-          }
-        }
-      },
-      {
-        "name": "PATCH /api/questions/:id",
-        "request": {
-          "method": "PATCH",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"status\": \"published\",\n  \"points\": 2\n}"
-          },
-          "url": {
-            "raw": "{{base_url}}/api/questions/{{question_id}}",
-            "host": ["{{base_url}}"],
-            "path": ["api", "questions", "{{question_id}}"]
-          }
-        }
-      },
-      {
-        "name": "DELETE /api/questions/:id",
-        "request": {
-          "method": "DELETE",
-          "url": {
-            "raw": "{{base_url}}/api/questions/{{question_id}}",
-            "host": ["{{base_url}}"],
-            "path": ["api", "questions", "{{question_id}}"]
-          }
-        }
-      },
-      {
-        "name": "POST /api/assessments",
-        "request": {
-          "method": "POST",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"title\": \"JavaScript fundamentals\",\n  \"questionIds\": [\"{{question_id}}\"]\n}"
-          },
-          "url": {
-            "raw": "{{base_url}}/api/assessments",
-            "host": ["{{base_url}}"],
-            "path": ["api", "assessments"]
-          }
-        }
-      },
-      {
-        "name": "GET /api/assessments",
-        "request": {
-          "method": "GET",
-          "url": {
-            "raw": "{{base_url}}/api/assessments?search=JavaScript&status=draft&page=1&limit=20",
-            "host": ["{{base_url}}"],
-            "path": ["api", "assessments"],
-            "query": [
-              { "key": "search", "value": "JavaScript" },
-              { "key": "status", "value": "draft" },
-              { "key": "page", "value": "1" },
-              { "key": "limit", "value": "20" }
-            ]
-          }
-        }
-      },
-      {
-        "name": "GET /api/assessments/:id",
-        "request": {
-          "method": "GET",
-          "url": {
-            "raw": "{{base_url}}/api/assessments/{{assessment_id}}",
-            "host": ["{{base_url}}"],
-            "path": ["api", "assessments", "{{assessment_id}}"]
-          }
-        }
-      },
-      {
-        "name": "PATCH /api/assessments/:id",
-        "request": {
-          "method": "PATCH",
-          "header": [
-            {
-              "key": "Content-Type",
-              "value": "application/json"
-            }
-          ],
-          "body": {
-            "mode": "raw",
-            "raw": "{\n  \"status\": \"published\"\n}"
-          },
-          "url": {
-            "raw": "{{base_url}}/api/assessments/{{assessment_id}}",
-            "host": ["{{base_url}}"],
-            "path": ["api", "assessments", "{{assessment_id}}"]
-          }
-        }
-      },
-      {
-        "name": "DELETE /api/assessments/:id",
-        "request": {
-          "method": "DELETE",
-          "url": {
-            "raw": "{{base_url}}/api/assessments/{{assessment_id}}",
-            "host": ["{{base_url}}"],
-            "path": ["api", "assessments", "{{assessment_id}}"]
-          }
+          "path": [
+            "api",
+            "admin",
+            "questions"
+          ]
         }
       }
-    ]
+    },
+    {
+      "name": "GET /api/admin/questions",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/admin/questions?search=HTTP&status=draft&type=single-choice&page=1&limit=20",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "questions"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": "HTTP"
+            },
+            {
+              "key": "status",
+              "value": "draft"
+            },
+            {
+              "key": "type",
+              "value": "single-choice"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /api/admin/questions/:id",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/admin/questions/{{question_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "questions",
+            "{{question_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PATCH /api/admin/questions/:id",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"published\",\n  \"points\": 2\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/questions/{{question_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "questions",
+            "{{question_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "DELETE /api/admin/questions/:id",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{base_url}}/api/admin/questions/{{question_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "questions",
+            "{{question_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "POST /api/admin/assessments",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"JavaScript fundamentals\",\n  \"questionIds\": [\"{{question_id}}\"]\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/assessments",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "assessments"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /api/admin/assessments",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/admin/assessments?search=JavaScript&status=draft&page=1&limit=20",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "assessments"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": "JavaScript"
+            },
+            {
+              "key": "status",
+              "value": "draft"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /api/admin/assessments/:id",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/admin/assessments/{{assessment_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "assessments",
+            "{{assessment_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "PATCH /api/admin/assessments/:id",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"published\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/admin/assessments/{{assessment_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "assessments",
+            "{{assessment_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "DELETE /api/admin/assessments/:id",
+      "request": {
+        "method": "DELETE",
+        "url": {
+          "raw": "{{base_url}}/api/admin/assessments/{{assessment_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "assessments",
+            "{{assessment_id}}"
+          ]
+        }
+      }
+    },
+    {
+      "name": "GET /api/admin/candidates",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/admin/candidates?search=&page=1&limit=50",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "admin",
+            "candidates"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": ""
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        }
+      }
+    }
+  ]
 }
