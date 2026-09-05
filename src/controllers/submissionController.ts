@@ -15,13 +15,14 @@ import { success } from "../utils/response";
 export const getCandidateAttempt = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError("Authentication required", 401);
 
-  const { assignmentId, candidateId } = req.params;
-  if (!isValidObjectId(assignmentId) || !isValidObjectId(candidateId)) {
-    throw new AppError("Invalid assignmentId or candidateId", 400);
+  const { assignmentId } = req.params;
+  if (!isValidObjectId(assignmentId)) {
+    throw new AppError("Invalid assignmentId", 400);
   }
 
-  if (req.user.role === 'candidate' && candidateId !== req.user.id) {
-    throw new AppError("Access Denied !!");
+  let candidateId = req.params.candidateId;
+  if (req.user.role === 'candidate') {
+    candidateId = req.user.id;
   }
 
   const attempt = await Attempt.findOne({ assignmentId, candidateId })
