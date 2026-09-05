@@ -238,7 +238,7 @@ export const getAttemptState = async (req: Request, res: Response) => {
       textAnswer: answer.textAnswer
     })),
     score: attempt.status === "submitted" ? attempt.scoreObtained : null,
-    totalMarks: attempt.status === "submitted" ? totalPoints : null,
+    totalMarks: attempt.status === "submitted" ? attempt.totalMarks : null,
     isFullyScored: attempt.status === "submitted" ? attempt.isFullyScored : null
   }, "Attempt fetched");
 };
