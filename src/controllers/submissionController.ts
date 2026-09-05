@@ -20,6 +20,10 @@ export const getCandidateAttempt = async (req: Request, res: Response) => {
     throw new AppError("Invalid assignmentId or candidateId", 400);
   }
 
+  if (req.user.role === 'candidate' && candidateId !== req.user.id) {
+    throw new AppError("Access Denied !!");
+  }
+
   const attempt = await Attempt.findOne({ assignmentId, candidateId })
   .populate("candidateId", "firstName lastName email")
   .populate("assessmentId", "title questionIds totalPoints")
