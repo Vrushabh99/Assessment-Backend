@@ -3,6 +3,7 @@ import * as assignmentCtrl from "../controllers/assignmentController";
 import * as assessmentCtrl from "../controllers/assessmentController";
 import * as candidateCtrl from "../controllers/candidateController";
 import * as questionCtrl from "../controllers/questionController";
+import * as submissionCtrl from "../controllers/submissionController";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 
@@ -39,5 +40,7 @@ router.get("/assessments", asyncHandler(assessmentCtrl.listAssessments));
 router.get("/assessments/:id", asyncHandler(assessmentCtrl.getAssessment));
 router.patch("/assessments/:id", asyncHandler(assessmentCtrl.updateAssessment));
 router.delete("/assessments/:id", asyncHandler(assessmentCtrl.deleteAssessment));
+router.get("/assignments/:assignmentId/candidates/:candidateId/attempt",asyncHandler(submissionCtrl.getCandidateAttempt));
+router.patch("/attempts/:attemptId/score",asyncHandler(submissionCtrl.updateAttemptScore));
 
 export default router;

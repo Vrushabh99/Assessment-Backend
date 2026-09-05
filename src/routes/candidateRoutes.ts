@@ -1,6 +1,7 @@
 import { Router } from "express";
 import * as assignmentCtrl from "../controllers/assignmentController";
 import * as attemptCtrl from "../controllers/attemptController";
+import * as submissionCtrl from "../controllers/submissionController";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 
@@ -15,5 +16,7 @@ router.get("/assessments/:assessmentId/assignments/:assignmentId/attempt", async
 router.patch("/assessments/:assessmentId/assignments/:assignmentId/answers", asyncHandler(attemptCtrl.saveAnswer));
 router.post("/assessments/:assessmentId/assignments/:assignmentId/violations", asyncHandler(attemptCtrl.logViolation));
 router.post("/assessments/:assessmentId/assignments/:assignmentId/submit", asyncHandler(attemptCtrl.submitAttempt));
+router.get("/assignments/:assignmentId/candidate/:candidateId/attempt",asyncHandler(submissionCtrl.getCandidateAttempt));
+
 
 export default router;
