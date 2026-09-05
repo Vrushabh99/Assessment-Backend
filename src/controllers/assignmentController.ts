@@ -303,41 +303,20 @@ export const getAssignmentDetail = async (req: Request, res: Response) => {
   }
 
   const assignment = await Assignment.findById(assignmentId)
-    .populate("assessmentId", "title description totalPoints")
+    .populate("assessmentId", "title description totalPoints questionIds")
     .populate("assignedBy", "name email")
     .lean();
   if (!assignment) {
     throw new AppError("Assignment not found", 404);
   }
 
-  const attempts = await Attempt.find({ assignmentId })
-    .populate("candidateId", "name email")
-    .select("candidateId status startedAt submittedAt scoreObtained")
-    .sort({ createdAt: -1 })
-    .lean();
-
-  const summary = attempts.reduce(
-    (acc, a) => {
-      acc.total++;
-      acc[a.status] = (acc[a.status] ?? 0) + 1;
-      return acc;
-    },
-    { total: 0, assigned: 0, in_progress: 0, submitted: 0 } as Record<string, number>
-  );
+  
 
   success(
     res,
     {
-      assignment,
-      summary,
-      students: attempts.map((a) => ({
-        attemptId: a._id,
-        candidate: a.candidateId,
-        status: a.status,
-        startedAt: a.startedAt,
-        submittedAt: a.submittedAt,
-        score: a.scoreObtained
-      }))
+      ...assignment,
+      questionCount: assignment.assessmentId?.questionIds?.length || 0
     },
     "Assignment detail fetched"
   );
@@ -582,8 +561,25 @@ export const getAssignmentCandidates = async (req: Request, res: Response) => {
 export const getMyAssessments = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError("Authentication required", 401);
 
-  const attempts = await Attempt.find({ candidateId: req.user.id })
-    .select("status scoreObtained assignmentId assessmentId")
+  const { status } = req.query;
+  const filter = {
+    candidateId: req.user.id,
+  };
+  if (status) {
+    if (status === 'graded') {
+      filter.status = 'submitted';
+      filter.isFullyScored = true;
+    }
+    else if (status === 'submitted') {
+      filter.status = status;
+      filter.isFullyScored = false;
+    } else {
+      filter.status = status;
+    }
+  }
+
+  const attempts = await Attempt.find(filter)
+    .select("status scoreObtained assignmentId assessmentId isFullyScored")
     .populate({ path: "assignmentId", select: "expiresAt status durationMinutes description" })
     .populate({ path: "assessmentId", select: "title description" })
     .sort({ createdAt: -1 })
@@ -610,6 +606,7 @@ export const getMyAssessments = async (req: Request, res: Response) => {
 
     return {
       attemptId: attempt._id,
+      isFullyScored: attempt.isFullyScored,
       assessmentId: assessment._id,
       assignmentId: assignment._id,
       title: assessment.title,
