@@ -46,6 +46,17 @@ const getRemainingMs = (startedAt: Date, durationMinutes: number): number => {
   return deadline - Date.now();
 };
 
+const enforceTimer = async (
+  attempt: InstanceType<typeof Attempt>,
+  assignment: InstanceType<typeof Assignment>
+): Promise<void> => {
+  if (attempt.status !== "in_progress" || !attempt.startedAt) return;
+  const remainingMs = getRemainingMs(attempt.startedAt, assignment.durationMinutes);
+  if (remainingMs <= 0) {
+    await finalizeSubmission(attempt, "timer_expired");
+  }
+};
+
 const scoreObjectiveAnswer = (
   question: { additionalInfo: { correctAnswers?: number[] }; points: number },
   selectedOptionIds?: number[]
@@ -116,11 +127,7 @@ export const startAttempt = async (req: Request, res: Response) => {
     await attempt.save();
   }
 
-  const remainingMs = getRemainingMs(attempt.startedAt, assignment.durationMinutes);
-  if (remainingMs <= 0) {
-    await finalizeSubmission(attempt, "timer_expired");
-  }
-
+  await enforceTimer(attempt, assignment);
   // Return full attempt state like getAttemptState does
   const assessment = await Assessment.findById(attempt.assessmentId)
     .select("title questionIds totalPoints")
@@ -174,6 +181,7 @@ export const getAttemptState = async (req: Request, res: Response) => {
 
   if (attempt.status !== "submitted") {
     assertAssignmentUsable(assignment);
+    await enforceTimer(attempt, assignment);
   }
 
   const assessment = await Assessment.findById(attempt.assessmentId)
@@ -227,6 +235,13 @@ export const saveAnswer = async (req: Request, res: Response) => {
   const attempt = await getOwnedAttempt(req);
   if (attempt.status === "submitted") throw new AppError("Cannot edit a submitted attempt", 400);
   if (attempt.status !== "in_progress") throw new AppError("Attempt has not been started", 400);
+
+  const assignment = await getAssignmentOrThrow(String(attempt.assignmentId));
+  await enforceTimer(attempt, assignment);
+
+  if ((attempt.status as string) === "submitted") {
+    throw new AppError("Time is up for this attempt; it has been auto-submitted", 400);
+  }
 
   const { questionId, selectedOptionIds, textAnswer } = req.body as Record<string, unknown>;
   if (typeof questionId !== "string" || !isValidObjectId(questionId)) {

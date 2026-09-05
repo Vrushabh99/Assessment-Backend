@@ -29,7 +29,7 @@ export const getCandidateAttempt = async (req: Request, res: Response) => {
     throw new AppError("No attempt found for this candidate on this assignment", 404);
   }
 
-  const questionIds = attempt.assessmentId.questionIds;
+  const questionIds = (attempt.assessmentId as any )?.questionIds;
   const questions = await Question.find({ _id: { $in: questionIds } })
     .select("_id questionText type points additionalInfo")
     .lean();
@@ -37,10 +37,7 @@ export const getCandidateAttempt = async (req: Request, res: Response) => {
   const result = {
     attemptId: attempt._id,
     assignmentId: attempt.assignmentId,
-    candidate: {
-      ...attempt.candidateId,
-      fullName: `${attempt.candidateId.firstName} ${attempt.candidateId.lastName}`.trim(),
-    },
+    candidate: candidateId,
     assessment: attempt.assessmentId,
     status: attempt.status,
     startedAt: attempt.startedAt,

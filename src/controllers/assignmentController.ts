@@ -316,7 +316,7 @@ export const getAssignmentDetail = async (req: Request, res: Response) => {
     res,
     {
       ...assignment,
-      questionCount: assignment.assessmentId?.questionIds?.length || 0
+      questionCount: (assignment.assessmentId as any)?.questionIds?.length || 0
     },
     "Assignment detail fetched"
   );
@@ -567,7 +567,7 @@ export const getMyAssessments = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError("Authentication required", 401);
 
   const { status } = req.query;
-  const filter = {
+  const filter: Record<string, unknown> = {
     candidateId: req.user.id,
   };
   if (status) {
