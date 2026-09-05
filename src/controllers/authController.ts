@@ -82,11 +82,14 @@ export const logout = async (_req: Request, res: Response) => {
 };
 
 export const me = async (req: Request, res: Response) => {
-  const user = await User.findById(req.user?.id).select("-password");
+  const user = await User.findById(req.user?.id).select("-password").lean();
 
   if (!user) {
     throw new AppError("User not found", 404);
   }
 
-  success(res, user);
+  success(res, {
+    ...user,
+    id: user._id,
+  });
 };
