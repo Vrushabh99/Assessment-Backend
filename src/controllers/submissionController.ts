@@ -134,24 +134,56 @@ export const updateAttemptScore = async (req: Request, res: Response) => {
 
   const updateByQuestionId = new Map(updates.map((u) => [u.questionId, u]));
 
-  let matchedAny = false;
-  for (const answer of attempt.answers) {
-    const update = updateByQuestionId.get(answer.questionId.toString());
-    if (!update) continue;
-    matchedAny = true;
+  // Look up max points per question so an admin can't accidentally award
+  // more marks than a question is worth.
+  const questions = await Question.find({ _id: { $in: updates.map((u) => u.questionId) } })
+    .select("_id points")
+    .lean();
+  const maxPointsByQuestionId = new Map(questions.map((q) => [q._id.toString(), q.points]));
 
-    answer.marksObtained = update.marksObtained;
-    answer.needsManualReview = false;
-    if (update.isCorrect !== undefined) {
-      answer.isCorrect = update.isCorrect;
+  for (const update of updates) {
+    const maxPoints = maxPointsByQuestionId.get(update.questionId);
+    if (maxPoints === undefined) {
+      throw new AppError(`Question ${update.questionId} was not found`, 400);
+    }
+    if (update.marksObtained > maxPoints) {
+      throw new AppError(
+        `marksObtained (${update.marksObtained}) exceeds this question's max points (${maxPoints})`,
+        400
+      );
+    }
+  }
+
+  let matchedAny = false;
+
+  for (const update of updates) {
+    matchedAny = true;
+    const existingAnswer = attempt.answers.find(
+      (answer) => answer.questionId.toString() === update.questionId
+    );
+
+    if (existingAnswer) {
+      existingAnswer.marksObtained = update.marksObtained;
+      existingAnswer.needsManualReview = false;
+      existingAnswer.isCorrect =
+        update.isCorrect !== undefined ? update.isCorrect : update.marksObtained > 0;
     } else {
-      // Fall back to a reasonable default: any marks awarded counts as correct
-      answer.isCorrect = update.marksObtained > 0;
+      // The candidate left this question completely blank (no answer was
+      // ever saved), so there is nothing in attempt.answers to update —
+      // without this branch, a skipped short-answer question could never
+      // be manually graded at all.
+      attempt.answers.push({
+        questionId: update.questionId as any,
+        textAnswer: "",
+        marksObtained: update.marksObtained,
+        needsManualReview: false,
+        isCorrect: update.isCorrect !== undefined ? update.isCorrect : update.marksObtained > 0
+      } as any);
     }
   }
 
   if (!matchedAny) {
-    throw new AppError("None of the provided questionIds match answers on this attempt", 400);
+    throw new AppError("No valid answer updates were provided", 400);
   }
 
   attempt.scoreObtained = attempt.answers.reduce((sum, a) => sum + a.marksObtained, 0);
