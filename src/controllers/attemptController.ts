@@ -72,31 +72,47 @@ const finalizeSubmission = async (
   autoSubmittedReason: "timer_expired" | "violation_limit_exceeded" | null = null,
   autoSubmittedViolationType: ViolationType | null = null
 ) => {
-  const questionIds = attempt.answers.map((answer) => answer.questionId);
-  const questions = await Question.find({ _id: { $in: questionIds } });
+  const assessment = await Assessment.findById(attempt.assessmentId).select("questionIds").lean();
+  if (!assessment) throw new AppError("Assessment not found", 404);
+
+  const questions = await Question.find({ _id: { $in: assessment.questionIds } });
   const questionMap = new Map(questions.map((question) => [question._id.toString(), question]));
+  const answerByQuestionId = new Map(
+    attempt.answers.map((answer) => [answer.questionId.toString(), answer])
+  );
 
   let totalMarks = 0;
   let scoreObtained = 0;
   let isFullyScored = true;
 
-  for (const answer of attempt.answers) {
-    const question = questionMap.get(answer.questionId.toString());
-    if (!question) continue;
+  // Iterate the assessment's FULL question list — not just what the
+  // candidate happened to answer — so skipped questions still count
+  // toward totalMarks (as 0 marks) instead of shrinking the denominator.
+  for (const questionId of assessment.questionIds) {
+    const question = questionMap.get(questionId.toString());
+    if (!question) continue; // question deleted after being assigned — excluded from scoring
     totalMarks += question.points;
 
+    const answer = answerByQuestionId.get(questionId.toString());
+
     if (question.type === "short-answer") {
-      answer.isCorrect = null;
-      answer.marksObtained = 0;
-      answer.needsManualReview = true;
-      isFullyScored = false;
-    } else {
-      const result = scoreObjectiveAnswer(question, answer.selectedOptionIds as unknown as number[]);
-      answer.isCorrect = result.isCorrect;
-      answer.marksObtained = result.marksObtained;
-      answer.needsManualReview = false;
-      scoreObtained += result.marksObtained;
+      if (answer) {
+        answer.isCorrect = null;
+        answer.marksObtained = 0;
+        answer.needsManualReview = true;
+        isFullyScored = false;
+      }
+      // Left blank entirely — nothing to manually review, stays at 0 marks.
+      continue;
     }
+
+    if (!answer) continue; // objective question skipped — 0 marks, no answer doc to score
+
+    const result = scoreObjectiveAnswer(question, answer.selectedOptionIds as unknown as number[]);
+    answer.isCorrect = result.isCorrect;
+    answer.marksObtained = result.marksObtained;
+    answer.needsManualReview = false;
+    scoreObtained += result.marksObtained;
   }
 
   attempt.status = "submitted";
@@ -222,7 +238,7 @@ export const getAttemptState = async (req: Request, res: Response) => {
       textAnswer: answer.textAnswer
     })),
     score: attempt.status === "submitted" ? attempt.scoreObtained : null,
-    totalMarks: attempt.status === "submitted" ? attempt.totalMarks : null,
+    totalMarks: attempt.status === "submitted" ? totalPoints : null,
     isFullyScored: attempt.status === "submitted" ? attempt.isFullyScored : null
   }, "Attempt fetched");
 };
