@@ -34,10 +34,15 @@ export const getCandidateAttempt = async (req: Request, res: Response) => {
     .select("_id questionText type points additionalInfo")
     .lean();
 
+  const candidate = candidateId as any;
+
   const result = {
     attemptId: attempt._id,
     assignmentId: attempt.assignmentId,
-    candidate: candidateId,
+    candidate: {
+      ...candidate,
+      fullName: `${candidate.firstName} ${candidate.lastName}`,
+    },
     assessment: attempt.assessmentId,
     status: attempt.status,
     startedAt: attempt.startedAt,
