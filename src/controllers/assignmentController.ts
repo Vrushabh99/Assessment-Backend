@@ -7,7 +7,7 @@ import { User } from "../models/User";
 import { Question } from "../models/Question";
 import { AppError } from "../middleware/errorHandler";
 import { success } from "../utils/response";
-
+import mongoose from "mongoose";
 const defaultViolationLimits = {
   tab_switch: 3,
   window_blur: 3,
@@ -569,66 +569,156 @@ export const getAssignmentCandidates = async (req: Request, res: Response) => {
 export const getMyAssessments = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError("Authentication required", 401);
 
-  const { status } = req.query;
-  const filter: Record<string, unknown> = {
-    candidateId: req.user.id,
-  };
-  if (status) {
-    if (status === 'graded') {
-      filter.status = 'submitted';
-      filter.isFullyScored = true;
-    }
-    else if (status === 'submitted') {
-      filter.status = status;
-      filter.isFullyScored = false;
-    } else {
-      filter.status = status;
-    }
-  }
+  const status = req.query.status as string;
 
-  const attempts = await Attempt.find(filter)
-    .select("status scoreObtained assignmentId assessmentId isFullyScored")
-    .populate({ path: "assignmentId", select: "expiresAt status durationMinutes description" })
-    .populate({ path: "assessmentId", select: "title description" })
-    .sort({ createdAt: -1 })
-    .lean();
+  const filter: Record<string, unknown> = {
+    candidateId: new mongoose.Types.ObjectId(req.user.id),
+  };
+
+  // 1. Initial Attempt Model Filter
+  if (status === "expired") {
+    filter.status = { $in: ["assigned", "in_progress"] };
+  } else {
+    const statusConfig: Record<string, Record<string, unknown>> = {
+      graded: { status: "submitted", isFullyScored: true },
+      submitted: { status: "submitted", isFullyScored: false },
+    };
+    Object.assign(filter, statusConfig[status] ?? { status });
+  }
 
   const now = new Date();
 
-  const assessments = attempts.map((attempt) => {
-    const assignment = attempt.assignmentId as any;
-    const assessment = attempt.assessmentId as any;
+  // 2. Base Pipeline
+  const pipeline: PipelineStage[] = [
+    { $match: filter },
+    { $sort: { createdAt: -1 } },
+    {
+      $lookup: {
+        from: "assignments",
+        localField: "assignmentId",
+        foreignField: "_id",
+        pipeline: [
+          {
+            $project: {
+              status: 1,
+              expiresAt: 1,
+              durationMinutes: 1,
+              description: 1,
+            },
+          },
+        ],
+        as: "assignment",
+      },
+    },
+    {
+      $unwind: {
+        path: "$assignment",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+  ];
 
-    const isExpired = assignment.expiresAt ? new Date(assignment.expiresAt) < now : false;
-    const isCancelled = assignment.status === "cancelled";
+  // 3. Assignment Expiry & Active Filters
+  if (status === "expired") {
+    pipeline.push({
+      $match: {
+        $or: [
+          { "assignment.expiresAt": { $ne: null, $lt: now } },
+          { "assignment.status": "cancelled" },
+        ],
+      },
+    });
+  } else if (!["submitted", "graded"].includes(status)) {
+    // For 'assigned', 'in_progress', etc.
+    pipeline.push({
+      $match: {
+        "assignment.status": { $ne: "cancelled" },
+        $or: [
+          { "assignment.expiresAt": null },
+          { "assignment.expiresAt": { $gt: now } },
+        ],
+      },
+    });
+  }
 
-    let accessible = true;
-    let reason: string | null = null;
-    if (isCancelled) {
-      accessible = false;
-      reason = "cancelled";
-    } else if (isExpired && attempt.status !== "submitted") {
-      accessible = false;
-      reason = "expired";
+  // 4. Assessment Lookup & Projection
+  pipeline.push(
+    {
+      $lookup: {
+        from: "assessments",
+        localField: "assessmentId",
+        foreignField: "_id",
+        pipeline: [{ $project: { title: 1, description: 1 } }],
+        as: "assessment",
+      },
+    },
+    {
+      $unwind: {
+        path: "$assessment",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        attemptId: "$_id",
+        isFullyScored: 1,
+        assessmentId: "$assessment._id",
+        assignmentId: "$assignment._id",
+        title: "$assessment.title",
+        description: "$assessment.description",
+        durationMinutes: "$assignment.durationMinutes",
+        expiresAt: "$assignment.expiresAt",
+        status: 1,
+        score: {
+          $cond: [{ $eq: ["$status", "submitted"] }, "$scoreObtained", null],
+        },
+        accessible: {
+          $cond: [
+            { $eq: ["$assignment.status", "cancelled"] },
+            false,
+            {
+              $cond: [
+                {
+                  $and: [
+                    { $gt: ["$assignment.expiresAt", null] },
+                    { $lt: ["$assignment.expiresAt", now] },
+                    { $ne: ["$status", "submitted"] },
+                  ],
+                },
+                false,
+                true,
+              ],
+            },
+          ],
+        },
+        reason: {
+          $switch: {
+            branches: [
+              {
+                case: { $eq: ["$assignment.status", "cancelled"] },
+                then: "cancelled",
+              },
+              {
+                case: {
+                  $and: [
+                    { $gt: ["$assignment.expiresAt", null] },
+                    { $lt: ["$assignment.expiresAt", now] },
+                    { $ne: ["$status", "submitted"] },
+                  ],
+                },
+                then: "expired",
+              },
+            ],
+            default: null,
+          },
+        },
+      },
     }
+  );
 
-    return {
-      attemptId: attempt._id,
-      isFullyScored: attempt.isFullyScored,
-      assessmentId: assessment._id,
-      assignmentId: assignment._id,
-      title: assessment.title,
-      description: assessment.description,
-      durationMinutes: assignment.durationMinutes,
-      expiresAt: assignment.expiresAt,
-      status: attempt.status,
-      score: attempt.status === "submitted" ? attempt.scoreObtained : null,
-      accessible,
-      reason
-    };
-  });
-
-  success(res, assessments, "Assessments fetched");
+  const assessments = await Attempt.aggregate(pipeline);
+  return success(res, assessments, "Assessments fetched");
 };
 
 /**
@@ -638,13 +728,12 @@ export const getMyAssessments = async (req: Request, res: Response) => {
 export const getCandidateAssessment = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError("Authentication required", 401);
 
-  const { assessmentId, assignmentId } = req.params;
-  if (!isValidObjectId(assessmentId) || !isValidObjectId(assignmentId)) {
+  const { assignmentId } = req.params;
+  if (!isValidObjectId(assignmentId)) {
     throw new AppError("Invalid assessmentId or assignmentId", 400);
   }
 
   const attempt = await Attempt.findOne({
-    assessmentId,
     assignmentId,
     candidateId: req.user.id
   })
@@ -657,14 +746,13 @@ export const getCandidateAssessment = async (req: Request, res: Response) => {
 
   const assignment = await Assignment.findOne({
     _id: assignmentId,
-    assessmentId
   })
     .select("_id assessmentId expiresAt durationMinutes violationLimits status description")
     .lean();
   if (!assignment) throw new AppError("Assignment is invalid for this assessment", 400);
 
   const assessment = await Assessment.findOne({
-    _id: assessmentId,
+    _id: assignment.assessmentId,
     status: "published"
   })
     .select("_id title questionIds totalPoints")

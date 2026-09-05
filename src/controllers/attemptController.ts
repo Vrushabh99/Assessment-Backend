@@ -18,12 +18,12 @@ const violationTypes: ViolationType[] = [
 
 const getOwnedAttempt = async (req: Request) => {
   if (!req.user) throw new AppError("Authentication required", 401);
-  const { assessmentId, assignmentId } = req.params;
-  if (!isValidObjectId(assessmentId) || !isValidObjectId(assignmentId)) {
-    throw new AppError("Invalid assessmentId or assignmentId", 400);
+  const { assignmentId } = req.params;
+  if (!isValidObjectId(assignmentId)) {
+    throw new AppError("Invalid assignmentId", 400);
   }
 
-  const attempt = await Attempt.findOne({ assessmentId, assignmentId, candidateId: req.user.id });
+  const attempt = await Attempt.findOne({ assignmentId, candidateId: req.user.id });
   if (!attempt) throw new AppError("Assessment is not assigned to this candidate", 404);
   return attempt;
 };
@@ -111,7 +111,7 @@ const finalizeSubmission = async (
 };
 
 /**
- * POST /api/candidate/assessments/:assessmentId/assignments/:assignmentId/start
+ * POST /api/candidate/assignments/:assignmentId/start
  * Starts (first call) or resumes (subsequent calls) a candidate's attempt.
  */
 export const startAttempt = async (req: Request, res: Response) => {
@@ -172,7 +172,7 @@ export const startAttempt = async (req: Request, res: Response) => {
 };
 
 /**
- * GET /api/candidate/assessments/:assessmentId/assignments/:assignmentId/attempt
+ * GET /api/candidate/assignments/:assignmentId/attempt
  * Returns full attempt state (questions without answer keys, saved answers, remaining time) for resuming.
  */
 export const getAttemptState = async (req: Request, res: Response) => {
@@ -228,7 +228,7 @@ export const getAttemptState = async (req: Request, res: Response) => {
 };
 
 /**
- * PATCH /api/candidate/assessments/:assessmentId/assignments/:assignmentId/answers
+ * PATCH /api/candidate/assignments/:assignmentId/answers
  * Autosaves a single question's answer.
  */
 export const saveAnswer = async (req: Request, res: Response) => {
@@ -272,7 +272,7 @@ export const saveAnswer = async (req: Request, res: Response) => {
 };
 
 /**
- * POST /api/candidate/assessments/:assessmentId/assignments/:assignmentId/violations
+ * POST /api/candidate/assignments/:assignmentId/violations
  * Logs a proctoring event and auto-submits when the configured violation limit is exceeded.
  */
 export const logViolation = async (req: Request, res: Response) => {
@@ -305,7 +305,7 @@ export const logViolation = async (req: Request, res: Response) => {
 };
 
 /**
- * POST /api/candidate/assessments/:assessmentId/assignments/:assignmentId/submit
+ * POST /api/candidate/assignments/:assignmentId/submit
  * Finalizes the attempt, scoring objective questions immediately.
  */
 export const submitAttempt = async (req: Request, res: Response) => {
