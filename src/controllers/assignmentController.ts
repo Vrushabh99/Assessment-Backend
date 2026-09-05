@@ -357,10 +357,15 @@ export const getAssignmentCandidates = async (req: Request, res: Response) => {
 
   // Step 2: Add status filter if provided
   if (status) {
-    if (!["assigned", "in_progress", "submitted"].includes(status)) {
+    if (!["assigned", "in_progress", "submitted", "graded"].includes(status)) {
       throw new AppError("Invalid status. Must be one of: assigned, in_progress, submitted", 400);
     }
-    pipeline.push({ "$match": { status } });
+    if (['submitted', 'graded'].includes(status)) {
+      pipeline.push({ "$match": { status: 'submitted' } });
+      pipeline.push({ "$match": { isFullyScored: status === 'graded' } });
+    } else {
+      pipeline.push({ "$match": { status } });
+    }
   }
 
   // Step 3: Lookup candidate
