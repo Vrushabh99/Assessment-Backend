@@ -589,7 +589,7 @@ export const getMyAssessments = async (req: Request, res: Response) => {
   const now = new Date();
 
   // 2. Base Pipeline
-  const pipeline: PipelineStage[] = [
+  const pipeline: any[] = [
     { $match: filter },
     { $sort: { createdAt: -1 } },
     {
