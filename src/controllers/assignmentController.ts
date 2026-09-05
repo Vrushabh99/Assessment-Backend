@@ -310,13 +310,16 @@ export const getAssignmentDetail = async (req: Request, res: Response) => {
     throw new AppError("Assignment not found", 404);
   }
 
-  
+  const candidateIds = await Attempt.distinct("candidateId", { assignmentId });
 
   success(
     res,
     {
-      ...assignment,
-      questionCount: (assignment.assessmentId as any)?.questionIds?.length || 0
+      assignment: {
+        ...assignment,
+        questionCount: (assignment.assessmentId as any)?.questionIds?.length || 0,
+      },
+      assignedCandidates: candidateIds,
     },
     "Assignment detail fetched"
   );
