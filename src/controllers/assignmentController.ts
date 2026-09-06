@@ -8,6 +8,7 @@ import { Question } from "../models/Question";
 import { AppError } from "../middleware/errorHandler";
 import { success } from "../utils/response";
 import mongoose from "mongoose";
+
 const defaultViolationLimits = {
   tab_switch: 3,
   window_blur: 3,
@@ -25,18 +26,28 @@ export const assignAssessment = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError("Authentication required", 401);
 
   const { assessmentId } = req.params;
-  const { candidateIds, durationMinutes, violationLimits, expiresAt, description, assignmentId } = req.body as Record<
+  const { candidateIds, durationMinutes, violationLimits, expiresAt, description } = req.body as Record<
     string,
     unknown
   >;
 
+  // --- Step 1: input validation ---
   if (!isValidObjectId(assessmentId)) {
     throw new AppError("Invalid assessmentId", 400);
   }
   if (!Array.isArray(candidateIds) || candidateIds.length === 0) {
     throw new AppError("candidateIds must be a non-empty array", 400);
   }
+  const malformedCandidateIds = (candidateIds as string[]).filter((id) => !isValidObjectId(id));
+  const wellFormedCandidateIds = (candidateIds as string[]).filter((id) => !malformedCandidateIds.includes(id));
+  if (wellFormedCandidateIds.length === 0) {
+    throw new AppError("No valid candidateIds provided", 400);
+  }
+  if (typeof durationMinutes !== "number" || durationMinutes < 1) {
+    throw new AppError("durationMinutes must be a positive number", 400);
+  }
 
+  // --- Step 2: assessment resolution ---
   const assessment = await Assessment.findById(assessmentId).select("_id status");
   if (!assessment) {
     throw new AppError("Assessment not found", 404);
@@ -45,65 +56,55 @@ export const assignAssessment = async (req: Request, res: Response) => {
     throw new AppError("Only published assessments can be assigned", 400);
   }
 
-  let existingAssignment = null as any;
-  if (assignmentId !== undefined && assignmentId !== null) {
-    if (!isValidObjectId(String(assignmentId))) {
-      throw new AppError("Invalid assignmentId", 400);
-    }
+  // --- Step 3: find-or-create the single Assignment for this assessment ---
+  // Assignment has a UNIQUE index on {assessmentId} — one shared config
+  // (duration/expiry/violation limits) per assessment, always reused.
+  // findOneAndUpdate+upsert keeps this atomic, avoiding a race where two
+  // concurrent requests both try to create the first Assignment.
+  const assignment = await Assignment.findOneAndUpdate(
+    { assessmentId },
+    {
+      $set: {
+        durationMinutes,
+        violationLimits: { ...defaultViolationLimits, ...((violationLimits as object) ?? {}) },
+        expiresAt: expiresAt ? new Date(expiresAt as string) : null,
+        description
+      },
+      $setOnInsert: { assessmentId, assignedBy: req.user.id }
+    },
+    { new: true, upsert: true }
+  );
 
-    existingAssignment = await Assignment.findById(assignmentId);
-    if (!existingAssignment) {
-      throw new AppError("Assignment not found", 404);
-    }
-    if (existingAssignment.assessmentId.toString() !== assessmentId) {
-      throw new AppError("Assignment does not belong to this assessment", 400);
-    }
-  }
-
-  if (typeof durationMinutes !== "number" || durationMinutes < 1) {
-    throw new AppError("durationMinutes must be a positive number", 400);
-  }
-
+  // --- Step 4: candidate validation ---
   const validCandidates = await User.find({
-    _id: { $in: candidateIds },
+    _id: { $in: wellFormedCandidateIds },
     role: "candidate"
   }).select("_id");
 
   const validCandidateIdSet = new Set(validCandidates.map((c) => c._id.toString()));
-  const invalidCandidateIds = (candidateIds as string[]).filter((id) => !validCandidateIdSet.has(id));
+  const invalidCandidateIds = [
+    ...malformedCandidateIds,
+    ...wellFormedCandidateIds.filter((id) => !validCandidateIdSet.has(id))
+  ];
 
   if (validCandidateIdSet.size === 0) {
     throw new AppError("None of the provided candidateIds are valid", 400);
   }
 
-  const assignment = existingAssignment ?? (await Assignment.create({
-    assessmentId,
-    assignedBy: req.user.id,
-    durationMinutes,
-    violationLimits: { ...defaultViolationLimits, ...((violationLimits as object) ?? {}) },
-    expiresAt: expiresAt ? new Date(expiresAt as string) : null,
-    description
-  }));
-
-  if (!existingAssignment) {
-    assignment.durationMinutes = durationMinutes;
-    assignment.violationLimits = { ...defaultViolationLimits, ...((violationLimits as object) ?? {}) };
-    assignment.expiresAt = expiresAt ? new Date(expiresAt as string) : null;
-    assignment.description = description as string | undefined;
-    await assignment.save();
-  }
-
+  // --- Step 5: dedup against existing attempts ---
+  // Attempt has a UNIQUE index on {assessmentId, candidateId} — a candidate
+  // can only ever have one Attempt per assessment, regardless of assignment.
+  // Any existing attempt (any status, any assignment) means this candidate
+  // is already accounted for — skip and report them.
   const existingAttempts = await Attempt.find({
     assessmentId,
     candidateId: { $in: Array.from(validCandidateIdSet) }
-  }).select("candidateId assignmentId").lean();
+  }).select("candidateId");
 
-  const alreadyAssignedMap = new Map(
-    existingAttempts.map((attempt: any) => [attempt.candidateId.toString(), attempt.assignmentId.toString()])
-  );
+  const alreadyAssignedSet = new Set(existingAttempts.map((a: any) => a.candidateId.toString()));
 
   const attemptDocs = Array.from(validCandidateIdSet)
-    .filter((candidateId) => !alreadyAssignedMap.has(candidateId))
+    .filter((candidateId) => !alreadyAssignedSet.has(candidateId))
     .map((candidateId) => ({
       assignmentId: assignment._id,
       assessmentId,
@@ -111,16 +112,17 @@ export const assignAssessment = async (req: Request, res: Response) => {
       status: "assigned" as const
     }));
 
-  const insertResult = await Attempt.insertMany(attemptDocs, { ordered: false }).catch((err) => {
-    if (err.writeErrors || err.name === "MongoBulkWriteError") {
-      return err.insertedDocs ?? [];
-    }
-    throw err;
-  });
+  // --- Step 6: create attempts for candidates who don't have one yet ---
+  const insertResult = attemptDocs.length
+    ? await Attempt.insertMany(attemptDocs, { ordered: false }).catch((err) => {
+        if (err.writeErrors || err.name === "MongoBulkWriteError") {
+          return err.insertedDocs ?? [];
+        }
+        throw err;
+      })
+    : [];
 
-  const assignedIdSet = new Set(insertResult.map((a: any) => a.candidateId.toString()));
-  const alreadyAssigned = Array.from(validCandidateIdSet).filter((id) => !assignedIdSet.has(id));
-
+  // --- Step 7: derive studentCount from ground truth (no stored array) ---
   assignment.studentCount = await Attempt.countDocuments({ assignmentId: assignment._id });
   await assignment.save();
 
@@ -130,7 +132,7 @@ export const assignAssessment = async (req: Request, res: Response) => {
       assignment,
       assignmentId: assignment._id,
       studentsAssigned: insertResult.length,
-      skipped: { invalidCandidateIds, alreadyAssigned }
+      skipped: { invalidCandidateIds, alreadyAssigned: Array.from(alreadyAssignedSet) }
     },
     "Assessment assigned",
     201
@@ -163,6 +165,7 @@ export const updateAssignment = async (req: Request, res: Response) => {
     assignmentId,
     status: { $in: ["in_progress", "submitted"] }
   });
+
   if (startedCount > 0) {
     throw new AppError("Cannot edit an assignment once a candidate has started", 400);
   }
@@ -254,31 +257,87 @@ export const cancelAssignment = async (req: Request, res: Response) => {
 export const getAssignments = async (req: Request, res: Response) => {
   if (!req.user) throw new AppError("Authentication required", 401);
 
-  const { assessmentId, status, page = "1", limit = "20" } = req.query as Record<string, string>;
-
-  const filter: Record<string, unknown> = {};
-  if (assessmentId) {
-    if (!isValidObjectId(assessmentId)) throw new AppError("Invalid assessmentId", 400);
-    filter.assessmentId = assessmentId;
-  }
-  if (status) {
-    if (!["active", "cancelled"].includes(status)) throw new AppError("Invalid status", 400);
-    filter.status = status;
-  }
+  const { assessmentId, status, page = "1", limit = "20", search } = req.query as Record<string, string>;
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
 
-  const [assignments, total] = await Promise.all([
-    Assignment.find(filter)
-      .populate("assessmentId", "title totalPoints description")
-      .populate("assignedBy", "firstName lastName email")
-      .sort({ createdAt: -1 })
-      .skip((pageNum - 1) * limitNum)
-      .limit(limitNum)
-      .lean(),
-    Assignment.countDocuments(filter)
-  ]);
+  const match: Record<string, unknown> = {};
+
+  if (assessmentId) {
+    if (!isValidObjectId(assessmentId)) throw new AppError("Invalid assessmentId", 400);
+    match.assessmentId = new Types.ObjectId(assessmentId);
+  }
+  if (status) {
+    if (!["active", "cancelled"].includes(status)) throw new AppError("Invalid status", 400);
+    match.status = status;
+  }
+
+  if (search) {
+    const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      const matchingAssessments = await Assessment.find({
+        title: { $regex: escaped, $options: "i" }
+      }).select("_id").lean();
+
+      const matchingIds = matchingAssessments.map((a) => a._id);
+
+      if (match.assessmentId) {
+        const overlaps = matchingIds.some((id) => id.equals(match.assessmentId as Types.ObjectId));
+        match.assessmentId = overlaps ? match.assessmentId : { $in: [] };
+      } else {
+        match.assessmentId = { $in: matchingIds };
+      }
+  }
+
+  const pipeline: any[] = [
+    { $match: match },
+    { $sort: { createdAt: -1 } },
+    {
+      $facet: {
+        data: [
+          { $skip: (pageNum - 1) * limitNum },
+          { $limit: limitNum },
+          {
+            $lookup: {
+              from: "assessments",
+              localField: "assessmentId",
+              foreignField: "_id",
+              as: "assessmentId"
+            }
+          },
+          { $unwind: "$assessmentId" },
+          {
+            $lookup: {
+              from: "users",
+              localField: "assignedBy",
+              foreignField: "_id",
+              as: "assignedBy"
+            }
+          },
+          { $unwind: { path: "$assignedBy", preserveNullAndEmptyArrays: true } },
+          {
+            $project: {
+              assessmentId: { _id: 1, title: 1, totalPoints: 1 },
+              assignedBy: { _id: 1, firstName: 1, lastName: 1, email: 1 },
+              durationMinutes: 1,
+              violationLimits: 1,
+              expiresAt: 1,
+              description: 1,
+              status: 1,
+              studentCount: 1,
+              createdAt: 1
+            }
+          }
+        ],
+        totalCount: [{ $count: "count" }]
+      }
+    }
+  ];
+
+  const [result] = await Assignment.aggregate(pipeline);
+  const assignments = result?.data ?? [];
+  const total = result?.totalCount?.[0]?.count ?? 0;
 
   success(
     res,
@@ -842,4 +901,35 @@ export const getCandidates = async (req: Request, res: Response) => {
     },
     "Candidates fetched"
   );
+};
+
+/**
+ * GET /api/admin/assessments/:assessmentId/assignment
+ * Fetch the single Assignment config/status for an assessment, if one exists.
+ */
+export const getAssignmentByAssessment = async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError("Authentication required", 401);
+ 
+  const { assessmentId } = req.params;
+  if (!isValidObjectId(assessmentId)) {
+    throw new AppError("Invalid assessmentId", 400);
+  }
+ 
+  const assessment = await Assessment.findOne({ _id: assessmentId, createdBy: req.user.id });
+  if (!assessment) {
+    throw new AppError("Assessment not found", 404);
+  }
+ 
+  const assignment = await Assignment.findOne({ assessmentId });
+  if (!assignment) {
+    throw new AppError("This assessment has not been assigned yet", 404);
+  }
+ 
+  const candidateIds = await Attempt.distinct("candidateId", { assignmentId: assignment._id });
+
+  success(res, {
+    assessment,
+    assignment,
+    assignedCandidates: candidateIds,
+  }, 'Assignment Fetched');
 };
