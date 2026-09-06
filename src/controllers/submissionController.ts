@@ -212,3 +212,51 @@ export const updateAttemptScore = async (req: Request, res: Response) => {
     "Attempt score updated"
   );
 };
+
+/**
+ * PATCH /api/admin/attempts/:attemptId/reset
+ * Resets an attempt back to "assigned" so the candidate can retake it.
+ * Wipes answers, proctoring history, and scoring — this is destructive and irreversible.
+ */
+export const resetAttempt = async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError("Authentication required", 401);
+
+  const { attemptId } = req.params;
+  if (!isValidObjectId(attemptId)) {
+    throw new AppError("Invalid attemptId", 400);
+  }
+
+  const attempt = await Attempt.findById(attemptId);
+  if (!attempt) {
+    throw new AppError("Attempt not found", 404);
+  }
+
+  if (attempt.status === "assigned") {
+    throw new AppError("Attempt has not been started yet — nothing to reset", 400);
+  }
+
+  attempt.status = "assigned";
+  attempt.startedAt = null;
+  attempt.submittedAt = null;
+  attempt.answers = [];
+  attempt.proctoringEvents = [];
+  attempt.violationCounts = {
+    tab_switch: 0,
+    window_blur: 0,
+    fullscreen_exit: 0,
+    copy: 0,
+    paste: 0,
+    right_click: 0,
+  };
+  attempt.autoSubmittedReason = null;
+  attempt.autoSubmittedViolationType = null;
+  attempt.totalMarks = 0;
+  attempt.scoreObtained = null;
+  attempt.isFullyScored = false;
+  attempt.scoredBy = null;
+  attempt.scoredAt = null;
+
+  await attempt.save();
+
+  success(res, { attemptId: attempt._id, status: attempt.status }, "Attempt reset");
+};
