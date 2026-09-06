@@ -132,7 +132,7 @@ const finalizeSubmission = async (
  */
 export const startAttempt = async (req: Request, res: Response) => {
   const attempt = await getOwnedAttempt(req);
-  if (attempt.status === "submitted") throw new AppError("This attempt has already been submitted", 400);
+  if (attempt.status === "submitted") throw new AppError("submitted", 400);
 
   const assignment = await getAssignmentOrThrow(String(attempt.assignmentId));
   assertAssignmentUsable(assignment);
