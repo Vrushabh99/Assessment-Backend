@@ -269,8 +269,13 @@ export const getAssignments = async (req: Request, res: Response) => {
     match.assessmentId = new Types.ObjectId(assessmentId);
   }
   if (status) {
-    if (!["active", "cancelled"].includes(status)) throw new AppError("Invalid status", 400);
-    match.status = status;
+    if (!["active", "cancelled", "expired"].includes(status)) throw new AppError("Invalid status", 400);
+    if (status === 'expired') {
+      match.status = 'active';
+      match.expiresAt = { $lt: new Date() }
+    } else {
+      match.status = status;
+    }
   }
 
   if (search) {
