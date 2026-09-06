@@ -117,3 +117,63 @@ export const deleteCandidate = async (req: Request, res: Response) => {
 
   success(res, { _id: candidate._id }, "Candidate deleted");
 };
+
+import { Attempt, AttemptStatus } from "../models/Attempt";
+
+const ATTEMPT_STATUSES: AttemptStatus[] = ["assigned", "in_progress", "submitted"];
+
+/**
+ * GET /api/admin/candidates/:candidateId/attempts
+ * All attempts for a single candidate, across every assignment/assessment, paginated.
+ */
+export const getCandidateAttempts = async (req: Request, res: Response) => {
+  const { candidateId } = req.params;
+  if (!isValidObjectId(candidateId)) throw new AppError("Invalid candidateId", 400);
+
+  const candidate = await User.findOne({ _id: candidateId, role: "candidate" }).select("_id firstName lastName email");
+  if (!candidate) throw new AppError("Candidate not found", 404);
+
+  const { status, page = "1", limit = "20" } = req.query as Record<string, string>;
+
+  const filter: Record<string, unknown> = { candidateId };
+  if (status) {
+    if (!ATTEMPT_STATUSES.includes(status as AttemptStatus)) {
+      throw new AppError(`Invalid status. Must be one of: ${ATTEMPT_STATUSES.join(", ")}`, 400);
+    }
+    filter.status = status;
+  }
+
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+
+  const [attempts, total] = await Promise.all([
+    Attempt.find(filter)
+      .populate("assessmentId", "title totalPoints questionIds")
+      .populate("assignmentId", "durationMinutes expiresAt status")
+      .select("assessmentId assignmentId status startedAt submittedAt scoreObtained totalMarks isFullyScored createdAt")
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum)
+      .lean(),
+    Attempt.countDocuments(filter)
+  ]);
+
+  const results = attempts.map((attempt: any) => ({
+    attemptId: attempt._id,
+    assessment: attempt.assessmentId,
+    assignment: attempt.assignmentId,
+    status: attempt.status,
+    startedAt: attempt.startedAt,
+    submittedAt: attempt.submittedAt,
+    score: attempt.status === "submitted" ? attempt.scoreObtained : null,
+    totalMarks: attempt.status === "submitted" ? attempt.totalMarks : null,
+    isFullyScored: attempt.isFullyScored,
+    createdAt: attempt.createdAt
+  }));
+
+  success(res, {
+    candidate,
+    attempts: results,
+    pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) }
+  }, "Candidate attempts fetched");
+};

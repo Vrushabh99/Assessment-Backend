@@ -22,6 +22,7 @@ router.post("/candidates", asyncHandler(candidateCtrl.createCandidate));
 router.get("/candidates/:candidateId", asyncHandler(candidateCtrl.getCandidate));
 router.patch("/candidates/:candidateId", asyncHandler(candidateCtrl.updateCandidate));
 router.delete("/candidates/:candidateId", asyncHandler(candidateCtrl.deleteCandidate));
+router.get("/candidates/:candidateId/attempt", asyncHandler(candidateCtrl.getCandidateAttempts));
 
 // Assignments
 router.post("/assessments/:assessmentId/assign", asyncHandler(assignmentCtrl.assignAssessment));
