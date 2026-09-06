@@ -1,4 +1,5 @@
 import { Router } from "express";
+import * as dashboardCtrl from "../controllers/dashboardController";
 import * as assignmentCtrl from "../controllers/assignmentController";
 import * as assessmentCtrl from "../controllers/assessmentController";
 import * as candidateCtrl from "../controllers/candidateController";
@@ -11,6 +12,10 @@ const router = Router();
 
 router.use(requireAuth, requireRole("admin", "creator"));
 
+//DashboardStats
+router.get("/dashboard/stats", asyncHandler(dashboardCtrl.getDashboardStats));
+
+
 // Candidates lookup
 router.get("/candidates", asyncHandler(candidateCtrl.getCandidates));
 router.post("/candidates", asyncHandler(candidateCtrl.createCandidate));
@@ -20,6 +25,7 @@ router.delete("/candidates/:candidateId", asyncHandler(candidateCtrl.deleteCandi
 
 // Assignments
 router.post("/assessments/:assessmentId/assign", asyncHandler(assignmentCtrl.assignAssessment));
+router.get("/assessments/:assessmentId/assignment", asyncHandler(assignmentCtrl.getAssignmentByAssessment));
 router.patch("/assignments/:assignmentId", asyncHandler(assignmentCtrl.updateAssignment));
 router.post("/assignments/:assignmentId/cancel", asyncHandler(assignmentCtrl.cancelAssignment));
 router.delete("/assignments/:assignmentId", asyncHandler(assignmentCtrl.deleteAssignment));
