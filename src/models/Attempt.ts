@@ -4,8 +4,11 @@ import { Schema, model, Types, Document } from "mongoose";
 export type AttemptStatus = "assigned" | "in_progress" | "submitted";
 export type ViolationType =
   | "tab_switch" | "window_blur" | "fullscreen_exit" | "copy" | "paste" | "right_click";
+export type AssignmentEventType = 
+  | "attempt_start" | "attempt_submit" | "attempt_flag" | "attempt_autosave" | "attempt_reset" | "attempt_graded";
 
-interface IAnswer {
+
+  interface IAnswer {
   questionId: Types.ObjectId;
   selectedOptionIds?: number[];
   textAnswer?: string;
@@ -24,8 +27,9 @@ interface IViolationCounts {
 }
 
 interface IProctoringEvent {
-  type: ViolationType;
-  timestamp: Date;
+  type: ViolationType | AssignmentEventType;
+  timestamp?: Date ;
+  message?: String | null;
 }
 
 export interface IAttempt extends Document {
@@ -59,7 +63,8 @@ const answerSchema = new Schema<IAnswer>(
   { _id: false }
 );
 
-const violationTypeEnum = ["tab_switch", "window_blur", "fullscreen_exit", "copy", "paste", "right_click"];
+export const violationTypeEnum = ["tab_switch", "window_blur", "fullscreen_exit", "copy", "paste", "right_click"];
+export const AssignmentEventTypeEnum = ["attempt_start", "attempt_submit", "attempt_flag", "attempt_autosave", "attempt_reset", "attempt_graded"];
 
 const violationCountsSchema = new Schema<IViolationCounts>(
   {
@@ -75,8 +80,9 @@ const violationCountsSchema = new Schema<IViolationCounts>(
 
 const proctoringEventSchema = new Schema<IProctoringEvent>(
   {
-    type: { type: String, enum: violationTypeEnum, required: true },
+    type: { type: String, enum: [...violationTypeEnum, ...AssignmentEventTypeEnum], required: true },
     timestamp: { type: Date, default: Date.now },
+    message: { type: String, default: null },
   },
   { _id: false }
 );

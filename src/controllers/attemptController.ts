@@ -115,6 +115,15 @@ const finalizeSubmission = async (
     scoreObtained += result.marksObtained;
   }
 
+  const logs = [{
+    type: "attempt_submit"
+  }] as any;
+  if (isFullyScored) {
+    logs.push({
+      type: "attempt_graded",
+      message: "Attempt auto graded by system."
+    })
+  }
   attempt.status = "submitted";
   attempt.submittedAt = new Date();
   attempt.totalMarks = totalMarks;
@@ -122,7 +131,7 @@ const finalizeSubmission = async (
   attempt.isFullyScored = isFullyScored;
   attempt.autoSubmittedReason = autoSubmittedReason;
   attempt.autoSubmittedViolationType = autoSubmittedViolationType;
-
+  attempt.proctoringEvents.push(...logs as any);
   await attempt.save();
 };
 
@@ -140,6 +149,7 @@ export const startAttempt = async (req: Request, res: Response) => {
   if (!attempt.startedAt) {
     attempt.startedAt = new Date();
     attempt.status = "in_progress";
+    attempt.proctoringEvents.push({ type: "attempt_start" });
     await attempt.save();
   }
 
@@ -259,7 +269,7 @@ export const saveAnswer = async (req: Request, res: Response) => {
     throw new AppError("Time is up for this attempt; it has been auto-submitted", 400);
   }
 
-  const { questionId, selectedOptionIds, textAnswer } = req.body as Record<string, unknown>;
+  const { questionId, selectedOptionIds, textAnswer, question  } = req.body as Record<string, any>;
   if (typeof questionId !== "string" || !isValidObjectId(questionId)) {
     throw new AppError("questionId must be a valid id", 400);
   }
@@ -283,6 +293,10 @@ export const saveAnswer = async (req: Request, res: Response) => {
     } as any);
   }
 
+  attempt.proctoringEvents.push({
+    type: "attempt_autosave",
+    message: `AutoSaved: ${JSON.stringify({ "Question_No": question.qp_number, "Answer": selectedOptionIds?.length ? selectedOptionIds : textAnswer })}`,
+  });
   await attempt.save();
   success(res, { saved: true }, "Answer saved");
 };
@@ -295,28 +309,46 @@ export const logViolation = async (req: Request, res: Response) => {
   const attempt = await getOwnedAttempt(req);
   if (attempt.status === "submitted") throw new AppError("Attempt already submitted", 400);
 
+  const assignment = await getAssignmentOrThrow(String(attempt.assignmentId));
+  await enforceTimer(attempt, assignment); // mutates `attempt` in place if it just expired
+
+  if ((attempt.status as string) === "submitted") {
+    throw new AppError("Time is up for this attempt; it has been auto-submitted", 400);
+  }
+
   const { type } = req.body as Record<string, unknown>;
   if (typeof type !== "string" || !violationTypes.includes(type as ViolationType)) {
     throw new AppError("type must be a valid violation type", 400);
   }
 
-  attempt.proctoringEvents.push({ type: type as ViolationType, timestamp: new Date() });
-  attempt.violationCounts[type as ViolationType] += 1;
-  await attempt.save();
+  // Atomic $inc + $push — can't be clobbered by a concurrent saveAnswer's
+  // full-document .save() (or vice versa) racing on the same Attempt doc.
+  const updated = await Attempt.findOneAndUpdate(
+    { _id: attempt._id, status: "in_progress" },
+    {
+      $inc: { [`violationCounts.${type}`]: 1 },
+      $push: { proctoringEvents: { type, timestamp: new Date() } }
+    },
+    { new: true }
+  );
 
-  const assignment = await Assignment.findById(attempt.assignmentId);
-  const limit = assignment?.violationLimits[type as ViolationType];
+  if (!updated) {
+    throw new AppError("Attempt is no longer in progress", 400);
+  }
+
+  const limit = assignment.violationLimits[type as ViolationType];
   let autoSubmitted = false;
 
-  if (limit !== undefined && attempt.violationCounts[type as ViolationType] > limit) {
-    await finalizeSubmission(attempt, "violation_limit_exceeded", type as ViolationType);
+  if (limit !== undefined && updated.violationCounts[type as ViolationType] > limit) {
+    updated.proctoringEvents.push({ type: 'attempt_flag'})
+    await finalizeSubmission(updated, "violation_limit_exceeded", type as ViolationType);
     autoSubmitted = true;
   }
 
   success(res, {
-    violationCounts: attempt.violationCounts,
+    violationCounts: updated.violationCounts,
     autoSubmitted,
-    status: attempt.status
+    status: updated.status
   }, "Violation logged");
 };
 

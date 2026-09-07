@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { isValidObjectId } from "mongoose";
-import { Attempt } from "../models/Attempt";
+import { AssignmentEventTypeEnum, Attempt } from "../models/Attempt";
 import { Assessment } from "../models/Assessment";
 import { Question } from "../models/Question";
 import { AppError } from "../middleware/errorHandler";
@@ -55,6 +55,7 @@ export const getCandidateAttempt = async (req: Request, res: Response) => {
     autoSubmittedReason: attempt.autoSubmittedReason,
     autoSubmittedViolationType: attempt.autoSubmittedViolationType,
     violationCounts: attempt.violationCounts,
+    proctoringEvents: attempt.proctoringEvents,
     total: attempt.totalMarks,
     score: attempt.scoreObtained,
     isFullyScored: attempt.isFullyScored,
@@ -190,7 +191,10 @@ export const updateAttemptScore = async (req: Request, res: Response) => {
   attempt.isFullyScored = attempt.answers.every((a) => !a.needsManualReview);
   attempt.scoredBy = req.user.id as any;
   attempt.scoredAt = new Date();
-
+  attempt.proctoringEvents.push({
+    type: "attempt_graded",
+    message: "Attempt manually graded."
+  });
   await attempt.save();
 
   success(
@@ -255,7 +259,10 @@ export const resetAttempt = async (req: Request, res: Response) => {
   attempt.isFullyScored = false;
   attempt.scoredBy = null;
   attempt.scoredAt = null;
-
+  attempt.proctoringEvents.push({
+    type: "attempt_reset",
+    message: "Attempt resetted by Admin.",
+  });
   await attempt.save();
 
   success(res, { attemptId: attempt._id, status: attempt.status }, "Attempt reset");
