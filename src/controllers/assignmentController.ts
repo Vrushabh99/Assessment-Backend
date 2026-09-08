@@ -7,7 +7,9 @@ import { User } from "../models/User";
 import { Question } from "../models/Question";
 import { AppError } from "../middleware/errorHandler";
 import { success } from "../utils/response";
+import { IUser } from "../models/User";
 import mongoose from "mongoose";
+import { env } from "../config/env";
 
 const defaultViolationLimits = {
   tab_switch: 3,
@@ -938,3 +940,54 @@ export const getAssignmentByAssessment = async (req: Request, res: Response) => 
     assignedCandidates: candidateIds,
   }, 'Assignment Fetched');
 };
+
+// services/assignment.service.ts
+const DEFAULT_ASSESSMENT_IDS = [
+  env.DEFAULT_ASSESSMENT_1_ID as string,
+  env.DEFAULT_ASSESSMENT_2_ID as string,
+];
+
+export async function assignDefaultAssessments(user: IUser): Promise<void> {
+  if (user.role !== "candidate") return;
+
+  for (const assessmentId of DEFAULT_ASSESSMENT_IDS) {
+    if (!assessmentId) continue;
+
+    // find (or create) the shared Assignment doc for this assessment
+    const assignment = await Assignment.findOne({ assessmentId });
+
+    // create the per-candidate Attempt, guarding against duplicates
+    await Attempt.findOneAndUpdate(
+      {
+        assignmentId: assignment?._id, candidateId: user.id },
+      {
+        $setOnInsert: {
+          assessmentId,
+          assignmentId: assignment?._id,
+          candidateId: user.id,
+          status: "assigned",
+        },
+      },
+      { upsert: true, new: true }
+    );
+
+    if (assignment) {
+      assignment.studentCount = await Attempt.countDocuments({ assignmentId: assignment?._id });
+      await assignment?.save();
+    }
+  }
+}
+
+export async function deleteAllAttemptsForCandidate(candidateId: string): Promise<number> {
+  const attempts = await Attempt.find({ candidateId }, { assignmentId: 1 });
+  const assignmentIds = attempts.map((a) => a.assignmentId);
+
+  const result = await Attempt.deleteMany({ candidateId });
+
+  await Assignment.updateMany(
+    { _id: { $in: assignmentIds } },
+    { $inc: { studentCount: -1 } }
+  );
+
+  return result.deletedCount ?? 0;
+}

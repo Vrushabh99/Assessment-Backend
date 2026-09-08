@@ -30,5 +30,9 @@ export const env = {
   jwtSecret: required("JWT_SECRET", "development-only-secret"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
   clientUrls,
-  clientUrl: clientUrls[0] ?? "http://localhost:3000"
+  clientUrl: clientUrls[0] ?? "http://localhost:3000",
+  googleClientId: required("GOOGLE_CLIENT_ID"),
+  DEFAULT_ASSESSMENT_1_ID: process.env.DEFAULT_ASSESSMENT_1_ID,
+  DEFAULT_ASSESSMENT_2_ID: process.env.DEFAULT_ASSESSMENT_2_ID,
+  
 };

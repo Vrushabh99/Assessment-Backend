@@ -114,11 +114,12 @@ export const deleteCandidate = async (req: Request, res: Response) => {
 
   const candidate = await User.findOneAndDelete({ _id: candidateId, role: "candidate" });
   if (!candidate) throw new AppError("Candidate not found", 404);
-
+  await deleteAllAttemptsForCandidate(candidateId)
   success(res, { _id: candidate._id }, "Candidate deleted");
 };
 
 import { Attempt, AttemptStatus } from "../models/Attempt";
+import { deleteAllAttemptsForCandidate } from "./assignmentController";
 
 const ATTEMPT_STATUSES: AttemptStatus[] = ["assigned", "in_progress", "submitted"];
 
