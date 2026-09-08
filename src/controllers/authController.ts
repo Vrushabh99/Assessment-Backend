@@ -1,4 +1,4 @@
-import { OAuth2Client } from 'google-auth-library';
+import { OAuth2Client, TokenPayload } from 'google-auth-library';
 import { Request, Response } from "express";
 import { User } from "../models/User";
 import { AppError } from "../middleware/errorHandler";

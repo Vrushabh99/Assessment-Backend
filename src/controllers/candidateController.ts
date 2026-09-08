@@ -109,7 +109,7 @@ export const updateCandidate = async (req: Request, res: Response) => {
 };
 
 export const deleteCandidate = async (req: Request, res: Response) => {
-  const { candidateId } = req.params;
+  const { candidateId } = req.params as Record<string, string>;
   if (!isValidObjectId(candidateId)) throw new AppError("Invalid candidateId", 400);
 
   const candidate = await User.findOneAndDelete({ _id: candidateId, role: "candidate" });
