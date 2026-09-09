@@ -2,13 +2,22 @@ import mongoose from "mongoose";
 import { env } from "./env";
 
 export const connectDatabase = async (): Promise<void> => {
-  mongoose.connect(env.mongoUri)
-  .then(() => console.log('Database connected successfully'))
-  .catch(err => console.error('Database connection error', err));
-
   const db = mongoose.connection;
-  db.on('error', console.error.bind(console, 'MongoDB connection error:'));
-  db.once('open', () => {
-    console.log('Connected to MongoDB');
+  db.on('error', error => console.error('MongoDB connection error: ', error));
+  db.on('connected', () => {
+    console.log('MongoDB connected');
   });
+  db.on("disconnected", () => {
+    console.warn("MongoDB disconnected");
+  });
+  db.on("reconnected", () => {
+    console.log("MongoDB reconnected");
+  });
+
+  try {
+    await mongoose.connect(env.mongoUri);
+    console.log('Database connected successfully');
+  } catch (error) {
+    console.error('Error connecting Database: ', error);
+  }
 };
