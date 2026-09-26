@@ -69,6 +69,7 @@ export const getCandidateAttempt = async (req: Request, res: Response) => {
         questionText: question?.questionText ?? null,
         type: question?.type ?? null,
         points: question?.points ?? null,
+        maxScore: question?.points ?? null,
         additionalInfo: question?.additionalInfo ?? null,
         answer:  question?.type === 'short-answer' ? answer?.textAnswer : answer?.selectedOptionIds || [],
         isCorrect: answer?.isCorrect ?? null,
