@@ -45,7 +45,7 @@ const questionSchema = {
     }
   },
   required: ["questions"]  // ✅ Correct placement
-};
+} as any;
 
 export class AIQuestionService {
         async generateQuestions(

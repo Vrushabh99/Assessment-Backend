@@ -1,3 +1,4 @@
+import { Request, Response } from "express";
 import { AppError } from "../middleware/errorHandler";
 import { Assessment } from "../models/Assessment";
 import { Question } from "../models/Question";
@@ -6,7 +7,7 @@ import { success } from "../utils/response";
 import { validateQuestionInput } from "./questionController";
 
 
-export const generateAIQuestions = async (req, res) => {
+export const generateAIQuestions = async (req: Request, res: Response) => {
     if (!req.user) throw new AppError("Authentication required", 401);
 
     const { topic, count, difficulty } = req.body;
@@ -37,10 +38,10 @@ export const generateAIQuestions = async (req, res) => {
     );
 };
 
-export const createAIAssessment = async (req, res) => {
+export const createAIAssessment = async (req: Request, res: Response) => {
     if (!req.user) throw new AppError("Authentication required", 401);
 
-    const { questions, title, status } = req.body;
+    const { questions, title, status } = req.body as Record<string, any>;
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
         throw new AppError("At least one question is required", 400);
@@ -50,7 +51,7 @@ export const createAIAssessment = async (req, res) => {
         validateQuestionInput(question);
         return {
             ...question,
-            createdBy: req.user.id,
+            createdBy: req?.user?.id,
         };
     });
 
@@ -61,11 +62,11 @@ export const createAIAssessment = async (req, res) => {
         throw err;
     });
 
-    const totalPoints = createdQuestions.reduce((sum, q) => sum + (q.points ?? 0), 0);
+    const totalPoints = createdQuestions.reduce((sum: number, q: any) => sum + (q.points ?? 0), 0);
 
     const assessment = await Assessment.create({
         title: title.trim(),
-        questionIds: createdQuestions.map(q => q._id),
+        questionIds: createdQuestions.map((q: any) => q._id),
         totalPoints,
         status,
         createdBy: req.user.id
