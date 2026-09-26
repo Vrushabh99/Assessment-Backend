@@ -4,6 +4,7 @@ import { Assessment, AssessmentStatus } from "../models/Assessment";
 import { Question } from "../models/Question";
 import { AppError } from "../middleware/errorHandler";
 import { success } from "../utils/response";
+import { Assignment } from "../models/Assignment";
 
 const assessmentStatuses: AssessmentStatus[] = ["draft", "published", "archived"];
 
@@ -143,6 +144,8 @@ export const updateAssessment = async (req: Request, res: Response) => {
 
 export const deleteAssessment = async (req: Request, res: Response) => {
   const assessment = await getOwnedAssessment(req);
+  const assignment = await Assignment.findOne({ assessmentId: assessment._id });
+  if (assignment) throw new AppError("Assigned Assessment can't be Deleted", 400);
   await assessment.deleteOne();
   success(res, null, "Assessment deleted");
 };

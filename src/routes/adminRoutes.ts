@@ -5,6 +5,7 @@ import * as assessmentCtrl from "../controllers/assessmentController";
 import * as candidateCtrl from "../controllers/candidateController";
 import * as questionCtrl from "../controllers/questionController";
 import * as submissionCtrl from "../controllers/submissionController";
+import * as aiAssessmentCtrl from "../controllers/aiAssessmentController";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { asyncHandler } from "../utils/asyncHandler";
 
@@ -33,6 +34,10 @@ router.delete("/assignments/:assignmentId", asyncHandler(assignmentCtrl.deleteAs
 router.get("/assignments", asyncHandler(assignmentCtrl.getAssignments));
 router.get("/assignments/:assignmentId/candidates", asyncHandler(assignmentCtrl.getAssignmentCandidates));
 router.get("/assignments/:assignmentId", asyncHandler(assignmentCtrl.getAssignmentDetail));
+
+// AI Assessments
+router.post("/ai/generate-questions", asyncHandler(aiAssessmentCtrl.generateAIQuestions));
+router.post("/ai/create-assessment", asyncHandler(aiAssessmentCtrl.createAIAssessment));
 
 // Questions
 router.post("/questions", asyncHandler(questionCtrl.createQuestion));

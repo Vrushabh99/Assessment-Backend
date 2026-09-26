@@ -8,7 +8,7 @@ const questionTypes: QuestionType[] = ["single-choice", "multiple-choice", "shor
 const difficulties: QuestionDifficulty[] = ["easy", "medium", "hard"];
 const statuses: QuestionStatus[] = ["draft", "published"];
 
-const validateQuestionInput = (body: Record<string, unknown>, partial = false): void => {
+export const validateQuestionInput = (body: Record<string, unknown>, partial = false): void => {
   const required = ["questionText", "type", "difficulty", "points"];
   if (!partial && required.some((field) => body[field] === undefined)) {
     throw new AppError("questionText, type, difficulty and points are required", 400);
@@ -87,7 +87,7 @@ export const listQuestions = async (req: Request, res: Response) => {
   const skip = (pageNumber - 1) * limitNumber;
 
   const [questions, total] = await Promise.all([
-    Question.find(filter).sort({ qp_number: 1 }).skip(skip).limit(limitNumber),
+    Question.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNumber),
     Question.countDocuments(filter)
   ]);
 
