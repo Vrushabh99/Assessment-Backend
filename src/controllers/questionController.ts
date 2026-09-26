@@ -87,7 +87,7 @@ export const listQuestions = async (req: Request, res: Response) => {
   const skip = (pageNumber - 1) * limitNumber;
 
   const [questions, total] = await Promise.all([
-    Question.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limitNumber),
+    Question.find(filter).sort({ qp_number: -1 }).skip(skip).limit(limitNumber),
     Question.countDocuments(filter)
   ]);
 

@@ -52,10 +52,11 @@ export const createAIAssessment = async (req: Request, res: Response) => {
         return {
             ...question,
             createdBy: req?.user?.id,
+            tags: ['AI'],
         };
     });
 
-    const createdQuestions = await Question.insertMany(validatedQuestions,{ ordered: false }).catch((err) => {
+    const createdQuestions = await Question.insertMany(validatedQuestions,{ ordered: true }).catch((err) => {
         if (err.writeErrors || err.name === "MongoBulkWriteError") {
           return err.insertedDocs ?? [];
         }
@@ -69,7 +70,8 @@ export const createAIAssessment = async (req: Request, res: Response) => {
         questionIds: createdQuestions.map((q: any) => q._id),
         totalPoints,
         status,
-        createdBy: req.user.id
+        createdBy: req.user.id,
+        tags: ['AI'],
       });
 
     success(res, assessment, "Assessment created", 201);

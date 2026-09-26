@@ -325,7 +325,7 @@ export const getAssignments = async (req: Request, res: Response) => {
           { $unwind: { path: "$assignedBy", preserveNullAndEmptyArrays: true } },
           {
             $project: {
-              assessmentId: { _id: 1, title: 1, totalPoints: 1 },
+              assessmentId: { _id: 1, title: 1, totalPoints: 1, tags: 1 },
               assignedBy: { _id: 1, firstName: 1, lastName: 1, email: 1 },
               durationMinutes: 1,
               violationLimits: 1,

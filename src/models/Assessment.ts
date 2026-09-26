@@ -10,6 +10,7 @@ export interface IAssessment extends Document {
   createdBy: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
+  tags: string[];
 }
 
 const assessmentSchema = new Schema<IAssessment>(
@@ -44,11 +45,16 @@ const assessmentSchema = new Schema<IAssessment>(
       ref: "User",
       required: true,
       index: true
+    },
+    tags: {
+      type: [String],
+      default: []
     }
   },
   { timestamps: true }
 );
 
 assessmentSchema.index({ createdBy: 1, createdAt: -1 });
+assessmentSchema.index({ questionIds: 1 });
 
 export const Assessment: Model<IAssessment> = model<IAssessment>("Assessment", assessmentSchema);

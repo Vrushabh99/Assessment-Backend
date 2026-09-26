@@ -66,7 +66,7 @@ export class AIQuestionService {
                 generationConfig: {
                     responseMimeType: "application/json",
                     responseSchema: questionSchema,
-                    maxOutputTokens: 3000,
+                    maxOutputTokens: 4000,
                     temperature: 0.7
                 }
             });

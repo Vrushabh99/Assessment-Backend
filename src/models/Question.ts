@@ -19,6 +19,7 @@ export interface IQuestion extends Document {
   qp_number: number;
   createdAt: Date;
   updatedAt: Date;
+  tags: string[];
 }
 
 interface ICounter extends Document {
@@ -50,7 +51,8 @@ const questionSchema = new Schema<IQuestion>(
       expectedAnswer: { type: String, trim: true }
     },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true, immutable: true },
-    qp_number: { type: Number, required: true, unique: true, immutable: true }
+    qp_number: { type: Number, required: true, unique: true, immutable: true },
+    tags: { type: [String], default: [] },
   },
   { timestamps: true }
 );

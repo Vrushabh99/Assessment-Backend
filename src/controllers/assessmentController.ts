@@ -143,9 +143,29 @@ export const updateAssessment = async (req: Request, res: Response) => {
 };
 
 export const deleteAssessment = async (req: Request, res: Response) => {
+  const { deleteQuestions = false } = req.body as Record<string, unknown>;
   const assessment = await getOwnedAssessment(req);
-  const assignment = await Assignment.findOne({ assessmentId: assessment._id });
+
+  const assignment = await Assignment.findOne({ assessmentId: assessment._id }).lean();
   if (assignment) throw new AppError("Assigned Assessment can't be Deleted", 400);
+
+  if (deleteQuestions && assessment.questionIds.length) {
+    // Find which of this assessment's questions are still referenced by OTHER assessments
+    const stillUsed = await Assessment.distinct('questionIds', {
+      _id: { $ne: assessment._id },
+      questionIds: { $in: assessment.questionIds },
+    });
+
+    const stillUsedSet = new Set(stillUsed.map(String));
+    const safeToDelete = assessment.questionIds.filter(
+      (qId) => !stillUsedSet.has(String(qId))
+    );
+
+    if (safeToDelete.length) {
+      await Question.deleteMany({ _id: { $in: safeToDelete } });
+    }
+  }
+
   await assessment.deleteOne();
-  success(res, null, "Assessment deleted");
+  success(res, null, 'Assessment deleted');
 };
