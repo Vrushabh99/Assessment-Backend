@@ -6,7 +6,7 @@ import { aiQuestionService } from "../services/aiQuestionService";
 import { success } from "../utils/response";
 import { validateQuestionInput } from "./questionController";
 
-
+//Add AI module
 export const generateAIQuestions = async (req: Request, res: Response) => {
     if (!req.user) throw new AppError("Authentication required", 401);
 
